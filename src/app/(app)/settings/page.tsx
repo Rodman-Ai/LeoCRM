@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { PageHeader } from "@/components/PageHeader";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { api } from "@/lib/client";
 
 interface Workspace {
@@ -49,6 +50,16 @@ export default function SettingsPage() {
         title="Settings"
         description="Connected Google Workspace storage."
       />
+      <div className="card mb-4 flex items-center justify-between gap-4">
+        <div>
+          <div className="text-sm font-semibold">Theme</div>
+          <div className="text-xs text-slate-500">
+            System follows your OS preference.
+          </div>
+        </div>
+        <ThemeToggle />
+      </div>
+
       <div className="card space-y-3">
         <Row label="Account" value={data?.user?.email ?? ""} />
         {loading ? (

@@ -105,6 +105,91 @@ export default function ReportsPage() {
       </div>
 
       <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
+        Pipeline forecast
+      </h2>
+      {(() => {
+        // Stage probabilities (loose industry defaults).
+        const PROB: Record<string, number> = {
+          new: 0.05,
+          contacted: 0.15,
+          engaged: 0.3,
+          qualified: 0.5,
+          won: 1,
+          lost: 0,
+        };
+        const byStage = new Map<string, { value: number; weighted: number; count: number }>();
+        for (const l of leads) {
+          const v = Number(l.value || 0);
+          const p = PROB[l.stage] ?? 0;
+          const cur = byStage.get(l.stage) ?? { value: 0, weighted: 0, count: 0 };
+          cur.value += v;
+          cur.weighted += v * p;
+          cur.count += 1;
+          byStage.set(l.stage, cur);
+        }
+        const stages = LEAD_STAGES.filter((s) => s !== "won" && s !== "lost");
+        const totalWeighted = stages.reduce(
+          (sum, s) => sum + (byStage.get(s)?.weighted ?? 0),
+          0,
+        );
+        const totalRaw = stages.reduce(
+          (sum, s) => sum + (byStage.get(s)?.value ?? 0),
+          0,
+        );
+        return (
+          <div className="card">
+            <div className="mb-3 flex items-center justify-between text-sm">
+              <span className="text-slate-500">
+                Open pipeline ($) · weighted by typical close probability
+              </span>
+              <span className="font-semibold">
+                ${Math.round(totalWeighted / 1000).toLocaleString()}k weighted
+                <span className="ml-2 text-slate-400">
+                  / ${Math.round(totalRaw / 1000).toLocaleString()}k raw
+                </span>
+              </span>
+            </div>
+            <div className="space-y-2">
+              {stages.map((s) => {
+                const b = byStage.get(s) ?? {
+                  value: 0,
+                  weighted: 0,
+                  count: 0,
+                };
+                const pct =
+                  totalRaw === 0 ? 0 : (b.value / totalRaw) * 100;
+                return (
+                  <div key={s} className="flex items-center gap-3 text-sm">
+                    <div className="w-20 text-xs uppercase tracking-wide text-slate-500">
+                      {s}
+                    </div>
+                    <div className="h-5 flex-1 rounded bg-slate-100 dark:bg-slate-800">
+                      <div
+                        className="h-full rounded bg-leo-500"
+                        style={{
+                          width: `${pct}%`,
+                          opacity: 0.4 + (PROB[s] ?? 0) * 0.6,
+                        }}
+                      />
+                    </div>
+                    <div className="w-32 text-right text-xs text-slate-500">
+                      ${Math.round(b.value / 1000).toLocaleString()}k ·{" "}
+                      <span className="text-leo-600">
+                        ${Math.round(b.weighted / 1000).toLocaleString()}k
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-[11px] text-slate-400">
+              Probabilities: new 5% · contacted 15% · engaged 30% · qualified 50%
+            </p>
+          </div>
+        );
+      })()}
+
+      <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
         Pipeline funnel
       </h2>
       <div className="card space-y-2">

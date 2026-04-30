@@ -5,8 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
 import { csvToContacts, type ParsedContact } from "@/lib/csv";
+import { downloadCsv, toCsv } from "@/lib/export";
 import type { Contact, Lead, SavedView, Sequence } from "@/lib/types";
 import { LEAD_STAGES, type LeadStage } from "@/lib/types";
+import { avatarClasses, avatarInitials } from "@/lib/ui";
 
 interface ViewFilter {
   q?: string;
@@ -210,6 +212,31 @@ export default function ContactsPage() {
         actions={
           <>
             <button
+              onClick={() => {
+                const merged = filtered.map((c) => {
+                  const lead = leadByContact.get(c.id);
+                  return {
+                    name: c.name,
+                    email: c.email,
+                    company: c.company,
+                    role: c.role,
+                    tags: c.tags,
+                    stage: lead?.stage ?? "",
+                    score: lead?.score ?? "",
+                    lastContactedAt: lead?.lastContactedAt ?? "",
+                    notes: c.notes,
+                  };
+                });
+                downloadCsv(
+                  `contacts-${new Date().toISOString().slice(0, 10)}.csv`,
+                  toCsv(merged),
+                );
+              }}
+              className="btn-secondary"
+            >
+              Export CSV
+            </button>
+            <button
               onClick={() => setShowImport(true)}
               className="btn-secondary"
             >
@@ -381,8 +408,12 @@ export default function ContactsPage() {
                   href={`/contacts/${c.id}`}
                   className="flex flex-1 items-center gap-3 min-w-0"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-leo-100 text-xs font-semibold text-leo-700">
-                    {(c.name || c.email || "?").slice(0, 1).toUpperCase()}
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full text-xs font-semibold ${avatarClasses(
+                      c.id,
+                    )}`}
+                  >
+                    {avatarInitials(c.name || c.email)}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">

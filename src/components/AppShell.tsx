@@ -7,6 +7,8 @@ import { ReactNode } from "react";
 import { DEMO_MODE } from "@/lib/client";
 import { DemoBanner } from "./DemoBanner";
 import { CommandPalette } from "./CommandPalette";
+import { QuickAdd } from "./QuickAdd";
+import { GlobalShortcuts } from "./GlobalShortcuts";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
@@ -54,6 +56,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="flex min-h-screen w-full flex-col">
       <DemoBanner />
       <CommandPalette />
+      <GlobalShortcuts />
       <div className="flex min-h-0 flex-1">
       <aside className="hidden w-60 shrink-0 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 md:flex md:flex-col">
         <div className="flex h-14 items-center gap-2 px-4">
@@ -91,19 +94,28 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-950 md:hidden">
+        <header className="flex h-14 items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-950 md:hidden">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-leo-600 text-sm font-bold text-white">
               L
             </div>
             <span className="font-semibold">LeoCRM</span>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="text-xs text-slate-500"
-          >
-            Sign out
-          </button>
+          <div className="flex items-center gap-2">
+            <QuickAdd />
+            <button
+              onClick={handleSignOut}
+              className="text-xs text-slate-500"
+            >
+              Sign out
+            </button>
+          </div>
+        </header>
+        <header className="hidden h-14 items-center gap-3 border-b border-slate-200 bg-white px-6 dark:border-slate-800 dark:bg-slate-950 md:flex">
+          <span className="text-xs text-slate-400">Press ⌘K to search · n to add contact · c to compose</span>
+          <div className="ml-auto flex items-center gap-2">
+            <QuickAdd />
+          </div>
         </header>
         <main className="flex-1 px-4 pb-24 pt-4 md:px-8 md:py-6">
           {children}

@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { Providers } from "./providers";
+import { ThemeBoot } from "@/components/ThemeToggle";
 
 export const metadata: Metadata = {
   title: "LeoCRM",
@@ -25,6 +26,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <ThemeBoot />
         <Providers>{children}</Providers>
       </body>
     </html>

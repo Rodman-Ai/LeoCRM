@@ -86,13 +86,32 @@ export default function ContactDetailPage() {
 
   async function changeStage(stage: LeadStage) {
     if (!lead) return;
+    let reason = "";
+    if (stage === "won" || stage === "lost") {
+      const r = window.prompt(
+        stage === "won"
+          ? "Brief reason for winning? (optional)"
+          : "Reason this lead was lost? (optional)",
+        "",
+      );
+      if (r === null) return; // cancelled
+      reason = r.trim();
+    }
     setBusy(true);
     try {
-      await api.patch(`/api/leads/${lead.id}`, { stage });
+      const patch: Record<string, string> = { stage };
+      if (reason) {
+        patch.notes = lead.notes
+          ? `${lead.notes}\n[${stage}] ${reason}`
+          : `[${stage}] ${reason}`;
+      }
+      await api.patch(`/api/leads/${lead.id}`, patch);
       await api.post("/api/activity/log", {
         contactId: contact?.id,
         type: "stage_change",
-        summary: `Stage: ${lead.stage} → ${stage}`,
+        summary: `Stage: ${lead.stage} → ${stage}${
+          reason ? ` — ${reason}` : ""
+        }`,
       });
       await load();
     } finally {
@@ -127,6 +146,14 @@ export default function ContactDetailPage() {
     await api.patch(`/api/tasks/${t.id}`, {
       status: t.status === "open" ? "done" : "open",
     });
+    await load();
+  }
+
+  async function snoozeTask(t: Task, days: number) {
+    const base = t.dueAt ? new Date(t.dueAt) : new Date();
+    if (Number.isNaN(base.getTime())) base.setTime(Date.now());
+    base.setTime(base.getTime() + days * 24 * 3600 * 1000);
+    await api.patch(`/api/tasks/${t.id}`, { dueAt: base.toISOString().slice(0, 10) });
     await load();
   }
 
@@ -177,11 +204,64 @@ export default function ContactDetailPage() {
         <div className="card md:col-span-1">
           <h3 className="mb-3 text-sm font-semibold">Details</h3>
           <dl className="space-y-2 text-sm">
+            <EditableRow
+              k="Name"
+              v={contact.name}
+              onSave={async (v) => {
+                await api.patch(`/api/contacts/${contact.id}`, { name: v });
+                await load();
+              }}
+            />
             <Row k="Email" v={contact.email} />
-            <Row k="Phone" v={contact.phone} />
-            <Row k="LinkedIn" v={contact.linkedin} />
-            <Row k="Tags" v={contact.tags} />
-            <Row k="Notes" v={contact.notes} pre />
+            <EditableRow
+              k="Role"
+              v={contact.role}
+              onSave={async (v) => {
+                await api.patch(`/api/contacts/${contact.id}`, { role: v });
+                await load();
+              }}
+            />
+            <EditableRow
+              k="Company"
+              v={contact.company}
+              onSave={async (v) => {
+                await api.patch(`/api/contacts/${contact.id}`, { company: v });
+                await load();
+              }}
+            />
+            <EditableRow
+              k="Phone"
+              v={contact.phone}
+              onSave={async (v) => {
+                await api.patch(`/api/contacts/${contact.id}`, { phone: v });
+                await load();
+              }}
+            />
+            <EditableRow
+              k="LinkedIn"
+              v={contact.linkedin}
+              onSave={async (v) => {
+                await api.patch(`/api/contacts/${contact.id}`, { linkedin: v });
+                await load();
+              }}
+            />
+            <EditableRow
+              k="Tags"
+              v={contact.tags}
+              onSave={async (v) => {
+                await api.patch(`/api/contacts/${contact.id}`, { tags: v });
+                await load();
+              }}
+            />
+            <EditableRow
+              k="Notes"
+              v={contact.notes}
+              multiline
+              onSave={async (v) => {
+                await api.patch(`/api/contacts/${contact.id}`, { notes: v });
+                await load();
+              }}
+            />
           </dl>
         </div>
         <div className="card md:col-span-2">
@@ -258,10 +338,35 @@ export default function ContactDetailPage() {
                         <p className="text-xs text-slate-500">{t.notes}</p>
                       ) : null}
                     </div>
-                    <div className="text-xs text-slate-400">
+                    <div className="flex shrink-0 items-center gap-2 text-xs text-slate-400">
                       {t.dueAt
                         ? new Date(t.dueAt).toLocaleDateString()
                         : ""}
+                      {t.status === "open" ? (
+                        <span className="hidden gap-1 sm:flex">
+                          <button
+                            onClick={() => snoozeTask(t, 1)}
+                            className="rounded bg-slate-100 px-1 hover:bg-leo-50 hover:text-leo-700 dark:bg-slate-800"
+                            title="Snooze +1 day"
+                          >
+                            +1d
+                          </button>
+                          <button
+                            onClick={() => snoozeTask(t, 3)}
+                            className="rounded bg-slate-100 px-1 hover:bg-leo-50 hover:text-leo-700 dark:bg-slate-800"
+                            title="Snooze +3 days"
+                          >
+                            +3d
+                          </button>
+                          <button
+                            onClick={() => snoozeTask(t, 7)}
+                            className="rounded bg-slate-100 px-1 hover:bg-leo-50 hover:text-leo-700 dark:bg-slate-800"
+                            title="Snooze +7 days"
+                          >
+                            +1w
+                          </button>
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 ))
@@ -393,36 +498,194 @@ export default function ContactDetailPage() {
         </div>
       ) : null}
 
-      <h3 className="mb-2 mt-6 text-sm font-semibold">Email history</h3>
-      <div className="card divide-y divide-slate-200 p-0 dark:divide-slate-800">
+      <h3 className="mb-2 mt-6 text-sm font-semibold">Email threads</h3>
+      <div className="space-y-3">
         {emails.length === 0 ? (
-          <div className="p-6 text-center text-sm text-slate-500">
+          <div className="card text-center text-sm text-slate-500">
             No emails yet.
           </div>
         ) : (
-          emails
-            .slice()
-            .sort((a, b) => (b.sentAt || "").localeCompare(a.sentAt || ""))
-            .map((e) => (
-              <div key={e.id} className="p-3">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm font-medium">{e.subject}</p>
-                  {e.aiGenerated === "yes" ? (
-                    <span className="badge bg-leo-100 text-leo-700">AI</span>
-                  ) : null}
-                  <span className="ml-auto text-xs text-slate-400">
-                    {fmtDate(e.sentAt)}
-                  </span>
-                </div>
-                <pre className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-600 dark:text-slate-300">
-                  {e.body}
-                </pre>
-              </div>
-            ))
+          (() => {
+            const threads = new Map<string, EmailRecord[]>();
+            for (const e of emails) {
+              const k = e.threadId || `solo-${e.id}`;
+              const list = threads.get(k) ?? [];
+              list.push(e);
+              threads.set(k, list);
+            }
+            const groups = Array.from(threads.entries()).map(([k, msgs]) => ({
+              key: k,
+              msgs: msgs.slice().sort((a, b) =>
+                (a.sentAt || "").localeCompare(b.sentAt || ""),
+              ),
+            }));
+            groups.sort((a, b) => {
+              const al = a.msgs[a.msgs.length - 1].sentAt || "";
+              const bl = b.msgs[b.msgs.length - 1].sentAt || "";
+              return bl.localeCompare(al);
+            });
+            return groups.map((g) => {
+              const head = g.msgs[0];
+              const replied = g.msgs.some((m) => m.repliedAt);
+              return (
+                <ThreadCard
+                  key={g.key}
+                  head={head}
+                  msgs={g.msgs}
+                  replied={replied}
+                />
+              );
+            });
+          })()
         )}
       </div>
     </div>
   );
+}
+
+function EditableRow({
+  k,
+  v,
+  onSave,
+  multiline,
+}: {
+  k: string;
+  v: string;
+  onSave: (val: string) => Promise<void>;
+  multiline?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(v);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setVal(v), [v]);
+  if (editing) {
+    return (
+      <div>
+        <dt className="text-xs uppercase tracking-wide text-slate-400">{k}</dt>
+        {multiline ? (
+          <textarea
+            autoFocus
+            className="input mt-1 min-h-[80px]"
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+          />
+        ) : (
+          <input
+            autoFocus
+            className="input mt-1"
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+          />
+        )}
+        <div className="mt-1 flex gap-2 text-xs">
+          <button
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              try {
+                await onSave(val);
+                setEditing(false);
+              } finally {
+                setBusy(false);
+              }
+            }}
+            className="text-leo-600"
+          >
+            {busy ? "Saving…" : "Save"}
+          </button>
+          <button
+            onClick={() => {
+              setVal(v);
+              setEditing(false);
+            }}
+            className="text-slate-500"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div
+      onClick={() => setEditing(true)}
+      className="cursor-pointer rounded -mx-1 px-1 hover:bg-slate-50 dark:hover:bg-slate-900"
+      title="Click to edit"
+    >
+      <dt className="text-xs uppercase tracking-wide text-slate-400">{k}</dt>
+      {multiline ? (
+        <dd className="whitespace-pre-wrap text-sm">{v || "—"}</dd>
+      ) : (
+        <dd className="text-sm">{v || "—"}</dd>
+      )}
+    </div>
+  );
+}
+
+function ThreadCard({
+  head,
+  msgs,
+  replied,
+}: {
+  head: EmailRecord;
+  msgs: EmailRecord[];
+  replied: boolean;
+}) {
+  const [open, setOpen] = useState(msgs.length <= 2);
+  return (
+    <div className="card p-0">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center gap-2 p-3 text-left hover:bg-slate-50 dark:hover:bg-slate-900"
+      >
+        <p className="truncate text-sm font-medium">{head.subject}</p>
+        {head.aiGenerated === "yes" ? (
+          <span className="badge bg-leo-100 text-leo-700">AI</span>
+        ) : null}
+        {head.variant ? (
+          <span className="badge bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            {head.variant}
+          </span>
+        ) : null}
+        {replied ? (
+          <span className="badge bg-emerald-100 text-emerald-700">replied</span>
+        ) : null}
+        <span className="ml-auto text-xs text-slate-400">
+          {msgs.length} msg{msgs.length === 1 ? "" : "s"} ·{" "}
+          {fmtDateLocal(msgs[msgs.length - 1].sentAt)}
+        </span>
+      </button>
+      {open ? (
+        <ol className="divide-y divide-slate-100 border-t border-slate-100 dark:divide-slate-800 dark:border-slate-800">
+          {msgs.map((m, i) => (
+            <li key={m.id} className="p-3">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <span className="font-medium">
+                  {i === 0 ? "Sent" : `Reply ${i}`}
+                </span>
+                <span>· {fmtDateLocal(m.sentAt)}</span>
+                {m.repliedAt ? (
+                  <span className="ml-auto text-emerald-600">
+                    replied {fmtDateLocal(m.repliedAt)}
+                  </span>
+                ) : null}
+              </div>
+              <pre className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-700 dark:text-slate-200">
+                {m.body}
+              </pre>
+            </li>
+          ))}
+        </ol>
+      ) : null}
+    </div>
+  );
+}
+
+function fmtDateLocal(s: string) {
+  if (!s) return "";
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return d.toLocaleString();
 }
 
 function Row({ k, v, pre }: { k: string; v: string; pre?: boolean }) {
