@@ -1,0 +1,94 @@
+// Tiny localStorage-backed table store used in DEMO_MODE.
+
+import {
+  SEED_ACTIVITY,
+  SEED_CAMPAIGNS,
+  SEED_COMPANIES,
+  SEED_CONTACTS,
+  SEED_EMAILS,
+  SEED_ENROLLMENTS,
+  SEED_FORMS,
+  SEED_LEADS,
+  SEED_SEQUENCES,
+  SEED_SEQUENCE_STEPS,
+  SEED_TASKS,
+  SEED_TEMPLATES,
+  SEED_VIEWS,
+} from "./seed";
+
+const PREFIX = "leocrm.demo.";
+const SEED_FLAG = `${PREFIX}seeded.v1`;
+
+type AnyRow = Record<string, unknown> & { id: string };
+
+export const TABLES = {
+  contacts: SEED_CONTACTS,
+  leads: SEED_LEADS,
+  campaigns: SEED_CAMPAIGNS,
+  templates: SEED_TEMPLATES,
+  emails: SEED_EMAILS,
+  tasks: SEED_TASKS,
+  activity: SEED_ACTIVITY,
+  sequences: SEED_SEQUENCES,
+  sequenceSteps: SEED_SEQUENCE_STEPS,
+  enrollments: SEED_ENROLLMENTS,
+  companies: SEED_COMPANIES,
+  forms: SEED_FORMS,
+  views: SEED_VIEWS,
+} as const;
+
+export type TableName = keyof typeof TABLES;
+
+function lsAvailable(): boolean {
+  try {
+    return typeof window !== "undefined" && !!window.localStorage;
+  } catch {
+    return false;
+  }
+}
+
+function ensureSeeded() {
+  if (!lsAvailable()) return;
+  if (window.localStorage.getItem(SEED_FLAG)) return;
+  for (const [name, rows] of Object.entries(TABLES)) {
+    window.localStorage.setItem(PREFIX + name, JSON.stringify(rows));
+  }
+  window.localStorage.setItem(SEED_FLAG, "1");
+}
+
+export function readTable<T extends AnyRow>(name: TableName): T[] {
+  if (!lsAvailable()) {
+    return [...(TABLES[name] as unknown as T[])];
+  }
+  ensureSeeded();
+  const raw = window.localStorage.getItem(PREFIX + name);
+  if (!raw) return [];
+  try {
+    return JSON.parse(raw) as T[];
+  } catch {
+    return [];
+  }
+}
+
+export function writeTable<T extends AnyRow>(name: TableName, rows: T[]) {
+  if (!lsAvailable()) return;
+  window.localStorage.setItem(PREFIX + name, JSON.stringify(rows));
+}
+
+export function newId(prefix: string) {
+  const rnd = Math.random().toString(36).slice(2, 8);
+  return `${prefix}_${Date.now().toString(36)}${rnd}`;
+}
+
+export function nowIso() {
+  return new Date().toISOString();
+}
+
+export function resetDemo() {
+  if (!lsAvailable()) return;
+  for (const name of Object.keys(TABLES)) {
+    window.localStorage.removeItem(PREFIX + name);
+  }
+  window.localStorage.removeItem(SEED_FLAG);
+  ensureSeeded();
+}
