@@ -1,0 +1,97 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { signOut, useSession } from "next-auth/react";
+import { ReactNode } from "react";
+
+const NAV = [
+  { href: "/", label: "Dashboard", icon: "" },
+  { href: "/contacts", label: "Contacts", icon: "" },
+  { href: "/leads", label: "Pipeline", icon: "" },
+  { href: "/campaigns", label: "Campaigns", icon: "" },
+  { href: "/compose", label: "AI Compose", icon: "" },
+  { href: "/templates", label: "Templates", icon: "" },
+  { href: "/settings", label: "Settings", icon: "" },
+];
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const path = usePathname();
+  const { data } = useSession();
+  const userName = data?.user?.name ?? data?.user?.email ?? "";
+
+  return (
+    <div className="flex min-h-screen w-full">
+      <aside className="hidden w-60 shrink-0 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 md:flex md:flex-col">
+        <div className="flex h-14 items-center gap-2 px-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-leo-600 text-sm font-bold text-white">
+            L
+          </div>
+          <span className="font-semibold">LeoCRM</span>
+        </div>
+        <nav className="flex-1 px-2 py-2">
+          {NAV.map((n) => {
+            const active = n.href === "/" ? path === "/" : path.startsWith(n.href);
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                className={`mb-1 flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium ${
+                  active
+                    ? "bg-leo-50 text-leo-700 dark:bg-leo-900/40 dark:text-leo-200"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-900"
+                }`}
+              >
+                {n.label}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="border-t border-slate-200 p-3 text-xs dark:border-slate-800">
+          <div className="truncate font-medium">{userName}</div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="mt-1 text-slate-500 hover:text-leo-600"
+          >
+            Sign out
+          </button>
+        </div>
+      </aside>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-950 md:hidden">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-leo-600 text-sm font-bold text-white">
+              L
+            </div>
+            <span className="font-semibold">LeoCRM</span>
+          </div>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="text-xs text-slate-500"
+          >
+            Sign out
+          </button>
+        </header>
+        <main className="flex-1 px-4 pb-24 pt-4 md:px-8 md:py-6">
+          {children}
+        </main>
+        <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t border-slate-200 bg-white text-xs dark:border-slate-800 dark:bg-slate-950 md:hidden">
+          {NAV.slice(0, 5).map((n) => {
+            const active = n.href === "/" ? path === "/" : path.startsWith(n.href);
+            return (
+              <Link
+                key={n.href}
+                href={n.href}
+                className={`flex flex-col items-center justify-center px-2 py-3 ${
+                  active ? "text-leo-600" : "text-slate-500"
+                }`}
+              >
+                <span className="font-medium">{n.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+    </div>
+  );
+}
