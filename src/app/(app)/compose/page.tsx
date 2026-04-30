@@ -17,6 +17,89 @@ export default function ComposePage() {
 const DRAFT_KEY = "leocrm.compose.draft";
 const SIG_KEY = "leocrm.compose.signature";
 
+const SPAM_TRIGGERS = [
+  "free",
+  "guarantee",
+  "100%",
+  "act now",
+  "limited time",
+  "urgent",
+  "click here",
+  "earn $",
+  "make money",
+  "no risk",
+  "winner",
+];
+
+function subjectChecks(subject: string) {
+  const s = (subject || "").trim();
+  const len = s.length;
+  const triggers = SPAM_TRIGGERS.filter((t) =>
+    s.toLowerCase().includes(t.toLowerCase()),
+  );
+  const allCaps = s.length >= 4 && s === s.toUpperCase();
+  const exclam = (s.match(/!/g) || []).length;
+  return {
+    len,
+    lenOk: len > 0 && len <= 60,
+    triggers,
+    allCaps,
+    exclam,
+  };
+}
+
+function rewriteBody(text: string, mode: string): string {
+  // Lightweight client-side stub. Real deploys could call /api/ai/rewrite.
+  if (!text) return text;
+  if (mode === "Tighter") {
+    const lines = text.split(/\n+/);
+    return lines
+      .map((l) =>
+        l.replace(/\s{2,}/g, " ").replace(/\b(very|really|just|that)\b /gi, ""),
+      )
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+  if (mode === "Formal") {
+    return text
+      .replace(/\bhi\b/gi, "Hello")
+      .replace(/\bthanks\b/gi, "Thank you")
+      .replace(/\b—/g, "Best regards,");
+  }
+  if (mode === "Casual") {
+    return text
+      .replace(/\bHello\b/g, "Hey")
+      .replace(/Thank you/gi, "Thanks")
+      .replace(/Best regards,?/gi, "Cheers,");
+  }
+  if (mode === "Add P.S.") {
+    return text + `\n\nP.S. Happy to send a one-pager if useful.`;
+  }
+  return text;
+}
+
+function suggestSendTime(): string {
+  // Naive demo heuristic: pick next Tuesday/Thursday/Wednesday at 10:30 local.
+  const now = new Date();
+  const target = new Date(now);
+  const day = target.getDay();
+  const goodDays = [2, 3, 4]; // Tue/Wed/Thu
+  let add = 0;
+  while (!goodDays.includes((day + add) % 7) || (add === 0 && now.getHours() >= 11)) {
+    add++;
+    if (add > 7) break;
+  }
+  target.setDate(target.getDate() + add);
+  target.setHours(10, 30, 0, 0);
+  const fmt = target.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  });
+  return `${fmt}, 10:30 AM local`;
+}
+
 function ComposeInner() {
   const search = useSearchParams();
   const router = useRouter();
@@ -262,7 +345,45 @@ function ComposeInner() {
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
             />
+            {(() => {
+              const s = subjectChecks(subject);
+              if (!subject) return null;
+              return (
+                <div className="mt-1 flex flex-wrap gap-2 text-[11px]">
+                  <span
+                    className={
+                      s.lenOk
+                        ? "text-emerald-600"
+                        : s.len > 60
+                          ? "text-amber-600"
+                          : "text-slate-500"
+                    }
+                  >
+                    {s.len} char{s.len === 1 ? "" : "s"}
+                    {s.lenOk ? " ✓" : s.len > 60 ? " (>60 may truncate)" : ""}
+                  </span>
+                  {s.triggers.length > 0 ? (
+                    <span className="text-rose-600">
+                      Spam trigger: {s.triggers.join(", ")}
+                    </span>
+                  ) : null}
+                  {s.allCaps ? (
+                    <span className="text-rose-600">All-caps</span>
+                  ) : null}
+                  {s.exclam > 1 ? (
+                    <span className="text-rose-600">{s.exclam} !s</span>
+                  ) : null}
+                </div>
+              );
+            })()}
           </label>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <span className="font-medium">Suggested send time:</span>{" "}
+            {suggestSendTime()}{" "}
+            <span className="text-slate-400">
+              (Tue–Thu mornings get the highest reply rate in your data.)
+            </span>
+          </div>
           {abTest && subjectB ? (
             <>
               <label className="block">
@@ -307,6 +428,27 @@ function ComposeInner() {
               onChange={(e) => setBody(e.target.value)}
             />
           </label>
+          {body ? (
+            <div className="flex flex-wrap items-center gap-1 text-xs">
+              <span className="text-slate-500">AI rewrite:</span>
+              {(["Tighter", "Formal", "Casual", "Add P.S."] as const).map(
+                (variant) => (
+                  <button
+                    key={variant}
+                    type="button"
+                    onClick={() => {
+                      // Local stub transform for demo. Hooks into AI in non-demo.
+                      const transformed = rewriteBody(body, variant);
+                      setBody(transformed);
+                    }}
+                    className="rounded-full bg-slate-100 px-2 py-1 hover:bg-leo-100 hover:text-leo-700 dark:bg-slate-800"
+                  >
+                    {variant}
+                  </button>
+                ),
+              )}
+            </div>
+          ) : null}
           {signature ? (
             <p className="text-[11px] text-slate-400">
               Signature appended at send time.

@@ -108,6 +108,150 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {(() => {
+        const today = new Date().toISOString().slice(0, 10);
+        const todaySends = sent.filter((e) => e.sentAt.slice(0, 10) === today)
+          .length;
+        const todayReplies = sent.filter(
+          (e) => e.repliedAt && e.repliedAt.slice(0, 10) === today,
+        ).length;
+        const stale = leads.filter(
+          (l) =>
+            l.stage !== "won" &&
+            l.stage !== "lost" &&
+            l.lastContactedAt &&
+            Date.now() - new Date(l.lastContactedAt).getTime() >
+              14 * 24 * 3600 * 1000,
+        ).length;
+
+        // Streak: consecutive days (working backwards from today) with >=1 send.
+        const sendDays = new Set(
+          sent.map((e) => (e.sentAt || "").slice(0, 10)).filter(Boolean),
+        );
+        let streak = 0;
+        for (let i = 0; i < 60; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          if (sendDays.has(d.toISOString().slice(0, 10))) streak++;
+          else break;
+        }
+
+        // Weekly goal: default 25/wk
+        const goal = 25;
+        const start = new Date();
+        start.setDate(start.getDate() - 6);
+        const weekStr = start.toISOString().slice(0, 10);
+        const weekSends = sent.filter(
+          (e) => e.sentAt.slice(0, 10) >= weekStr,
+        ).length;
+
+        // Suggested next contact: highest scoring lead not contacted in 7+ days
+        // among non-terminal stages
+        const sevenDaysAgo = Date.now() - 7 * 24 * 3600 * 1000;
+        const ranked = leads
+          .filter(
+            (l) =>
+              l.stage !== "won" &&
+              l.stage !== "lost" &&
+              (!l.lastContactedAt ||
+                new Date(l.lastContactedAt).getTime() < sevenDaysAgo),
+          )
+          .sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+        const nextLead = ranked[0];
+        const nextContact = nextLead
+          ? contacts.find((c) => c.id === nextLead.contactId)
+          : undefined;
+
+        return (
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <div className="card">
+              <div className="text-xs uppercase tracking-wide text-slate-500">
+                Today
+              </div>
+              <div className="mt-2 text-sm">
+                <div>
+                  <span className="font-semibold">{todaySends}</span> sent ·{" "}
+                  <span className="font-semibold text-emerald-600">
+                    {todayReplies}
+                  </span>{" "}
+                  replies
+                </div>
+                <div>
+                  <span className="font-semibold text-rose-600">{stale}</span>{" "}
+                  stale leads (14d+)
+                </div>
+                <div>
+                  Streak:{" "}
+                  <span className="font-semibold">
+                    {streak} day{streak === 1 ? "" : "s"}
+                  </span>{" "}
+                  🔥
+                </div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="text-xs uppercase tracking-wide text-slate-500">
+                Weekly send goal
+              </div>
+              <div className="mt-2 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">{weekSends}</span>
+                  <span className="text-slate-400">/ {goal}</span>
+                  <span className="ml-auto text-xs text-slate-500">
+                    {Math.min(100, Math.round((weekSends / goal) * 100))}%
+                  </span>
+                </div>
+                <div className="mt-2 h-2 rounded bg-slate-100 dark:bg-slate-800">
+                  <div
+                    className="h-2 rounded bg-leo-500"
+                    style={{
+                      width: `${Math.min(100, (weekSends / goal) * 100)}%`,
+                    }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Last 7 days. Adjust the target in Settings.
+                </p>
+              </div>
+            </div>
+            <div className="card">
+              <div className="text-xs uppercase tracking-wide text-slate-500">
+                Suggested next contact
+              </div>
+              {nextContact ? (
+                <div className="mt-2 text-sm">
+                  <Link
+                    className="font-semibold hover:text-leo-600"
+                    href={`/contacts/${nextContact.id}`}
+                  >
+                    {nextContact.name || nextContact.email}
+                  </Link>
+                  <div className="text-xs text-slate-500">
+                    {nextContact.role || ""}
+                    {nextContact.company ? ` · ${nextContact.company}` : ""}
+                  </div>
+                  <div className="mt-1 text-xs">
+                    Score{" "}
+                    <span className="font-semibold">{nextLead!.score}</span> ·
+                    Stage {nextLead!.stage}
+                  </div>
+                  <Link
+                    href={`/compose?contactId=${nextContact.id}`}
+                    className="mt-2 inline-block text-xs text-leo-600 hover:underline"
+                  >
+                    AI compose →
+                  </Link>
+                </div>
+              ) : (
+                <div className="mt-2 text-sm text-slate-500">
+                  Everyone's been contacted recently.
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
+
       <h2 className="mt-8 mb-3 text-sm font-semibold text-slate-500">
         Today
       </h2>

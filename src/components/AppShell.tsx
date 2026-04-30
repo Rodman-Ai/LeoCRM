@@ -10,6 +10,7 @@ import { CommandPalette } from "./CommandPalette";
 import { QuickAdd } from "./QuickAdd";
 import { GlobalShortcuts } from "./GlobalShortcuts";
 import { RecentlyViewed } from "./RecentlyViewed";
+import { OnboardingTour } from "./OnboardingTour";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
@@ -58,6 +59,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <DemoBanner />
       <CommandPalette />
       <GlobalShortcuts />
+      <OnboardingTour />
       <div className="flex min-h-0 flex-1">
       <aside className="hidden w-60 shrink-0 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 md:flex md:flex-col">
         <div className="flex h-14 items-center gap-2 px-4">

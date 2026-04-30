@@ -318,6 +318,118 @@ export default function ReportsPage() {
         </div>
       </div>
 
+      <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
+        Lead source ROI
+      </h2>
+      {(() => {
+        const bySource = new Map<
+          string,
+          { leads: number; contacted: number; engaged: number; won: number; pipeline: number }
+        >();
+        for (const l of leads) {
+          const s = l.source || "(none)";
+          const cur =
+            bySource.get(s) ?? {
+              leads: 0,
+              contacted: 0,
+              engaged: 0,
+              won: 0,
+              pipeline: 0,
+            };
+          cur.leads += 1;
+          if (l.stage === "contacted") cur.contacted += 1;
+          if (l.stage === "engaged" || l.stage === "qualified") cur.engaged += 1;
+          if (l.stage === "won") cur.won += 1;
+          if (l.stage !== "lost") cur.pipeline += Number(l.value || 0);
+          bySource.set(s, cur);
+        }
+        const rows = Array.from(bySource.entries()).sort(
+          (a, b) => b[1].leads - a[1].leads,
+        );
+        if (rows.length === 0) return null;
+        return (
+          <div className="card overflow-x-auto p-0">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900">
+                <tr>
+                  <th className="p-2 text-left">Source</th>
+                  <th className="p-2 text-right">Leads</th>
+                  <th className="p-2 text-right">Engaged+</th>
+                  <th className="p-2 text-right">Won</th>
+                  <th className="p-2 text-right">Conv. %</th>
+                  <th className="p-2 text-right">Pipeline $</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(([source, s]) => (
+                  <tr
+                    key={source}
+                    className="border-t border-slate-100 dark:border-slate-800"
+                  >
+                    <td className="p-2 font-medium">{source}</td>
+                    <td className="p-2 text-right">{s.leads}</td>
+                    <td className="p-2 text-right">{s.engaged}</td>
+                    <td className="p-2 text-right">{s.won}</td>
+                    <td className="p-2 text-right">
+                      {s.leads
+                        ? Math.round(
+                            ((s.engaged + s.won) / s.leads) * 100,
+                          )
+                        : 0}
+                      %
+                    </td>
+                    <td className="p-2 text-right">
+                      ${Math.round(s.pipeline / 1000).toLocaleString()}k
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
+
+      <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
+        Activity heatmap (last 60 days)
+      </h2>
+      {(() => {
+        const days = 60;
+        const counts = new Map<string, number>();
+        for (const e of sent) {
+          const d = (e.sentAt || "").slice(0, 10);
+          if (!d) continue;
+          counts.set(d, (counts.get(d) ?? 0) + 1);
+        }
+        const cells: { date: string; count: number }[] = [];
+        for (let i = days - 1; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const k = d.toISOString().slice(0, 10);
+          cells.push({ date: k, count: counts.get(k) ?? 0 });
+        }
+        const max = Math.max(1, ...cells.map((c) => c.count));
+        return (
+          <div className="card">
+            <div className="grid grid-cols-[repeat(60,minmax(0,1fr))] gap-[2px]">
+              {cells.map((c) => {
+                const intensity = c.count === 0 ? 0 : 0.2 + (c.count / max) * 0.8;
+                return (
+                  <div
+                    key={c.date}
+                    title={`${c.date}: ${c.count} sent`}
+                    className="aspect-square rounded-sm bg-leo-500"
+                    style={{ opacity: c.count === 0 ? 0.08 : intensity }}
+                  />
+                );
+              })}
+            </div>
+            <p className="mt-2 text-[11px] text-slate-400">
+              Each square is a day. Brighter = more sent.
+            </p>
+          </div>
+        );
+      })()}
+
       {campaigns.length > 0 ? (
         <>
           <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">

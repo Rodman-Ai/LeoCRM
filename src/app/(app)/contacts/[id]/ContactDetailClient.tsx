@@ -6,6 +6,9 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
 import { pushRecent } from "@/lib/recents";
+import { renderMarkdown } from "@/lib/markdown";
+import { pushTrash } from "@/lib/trash";
+import { useUI } from "@/components/ui/UIProvider";
 import type { Activity, Contact, EmailRecord, Lead, Task } from "@/lib/types";
 import { LEAD_STAGES, type LeadStage } from "@/lib/types";
 
@@ -27,6 +30,40 @@ export default function ContactDetailPage() {
   >("all");
   const [summarizing, setSummarizing] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
+  const ui = useUI();
+  const [allContacts, setAllContacts] = useState<Contact[]>([]);
+  useEffect(() => {
+    api.get<Contact[]>("/api/contacts").then(setAllContacts);
+  }, []);
+
+  function followUpSuggestions() {
+    if (!contact || !lead) return [] as string[];
+    const out: string[] = [];
+    const replied = emails.some((e) => e.repliedAt);
+    const days = lead.lastContactedAt
+      ? Math.round(
+          (Date.now() - new Date(lead.lastContactedAt).getTime()) /
+            (24 * 3600 * 1000),
+        )
+      : null;
+    if (lead.stage === "new") {
+      out.push("Send a 90-word opener referencing their company + a recent signal.");
+    } else if (replied && lead.stage !== "qualified" && lead.stage !== "won") {
+      out.push("They replied — propose two specific times next week.");
+    } else if (days !== null && days >= 7) {
+      out.push(`No contact in ${days}d — try a different angle (case study or ROI math).`);
+    }
+    if (lead.stage === "engaged" && Number(lead.value || 0) === 0) {
+      out.push("Add a value to this lead so it shows in the pipeline forecast.");
+    }
+    if (lead.stage === "qualified" && tasks.filter((t) => t.status === "open").length === 0) {
+      out.push("Add a follow-up task — qualified leads stall without a next action.");
+    }
+    if (out.length === 0) {
+      out.push("All looks healthy — pick the next contact from the dashboard.");
+    }
+    return out;
+  }
 
   function summarizeContact() {
     if (!contact) return;
@@ -168,9 +205,49 @@ export default function ContactDetailPage() {
   }
 
   async function remove() {
-    if (!confirm("Delete this contact and its lead?")) return;
+    if (!contact) return;
+    const okGo = await ui.confirm("Delete this contact and its lead?", {
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!okGo) return;
+    pushTrash({
+      id: contact.id,
+      kind: "contact",
+      label: contact.name || contact.email,
+      payload: contact,
+      related: lead ? [lead] : [],
+    });
     if (lead) await api.del(`/api/leads/${lead.id}`);
     await api.del(`/api/contacts/${id}`);
+    ui.toast(`Deleted ${contact.name || contact.email}.`, {
+      kind: "success",
+      action: {
+        label: "Undo",
+        onClick: async () => {
+          await api.post("/api/contacts", {
+            name: contact.name,
+            email: contact.email,
+            company: contact.company,
+            role: contact.role,
+            phone: contact.phone,
+            linkedin: contact.linkedin,
+            tags: contact.tags,
+            notes: contact.notes,
+          });
+          if (lead) {
+            await api.post("/api/leads", {
+              contactId: contact.id,
+              source: lead.source,
+              stage: lead.stage,
+            });
+          }
+          ui.toast("Restored.", { kind: "success" });
+          router.push("/contacts");
+        },
+      },
+      ttl: 8000,
+    });
     router.push("/contacts");
   }
 
@@ -202,6 +279,13 @@ export default function ContactDetailPage() {
             </button>
             <button onClick={() => setShowTask(true)} className="btn-secondary">
               + Task
+            </button>
+            <button
+              onClick={() => window.print()}
+              className="btn-secondary"
+              title="Print this contact"
+            >
+              Print
             </button>
             <button onClick={remove} className="btn-secondary">
               Delete
@@ -267,6 +351,14 @@ export default function ContactDetailPage() {
               k="Notes"
               v={contact.notes}
               multiline
+              renderValue={(v) => (
+                <div
+                  className="prose prose-sm max-w-none text-sm dark:prose-invert"
+                  dangerouslySetInnerHTML={{
+                    __html: renderMarkdown(v || "", allContacts),
+                  }}
+                />
+              )}
               onSave={async (v) => {
                 await api.patch(`/api/contacts/${contact.id}`, { notes: v });
                 await load();
@@ -326,6 +418,26 @@ export default function ContactDetailPage() {
             <p className="text-sm text-slate-500">No lead record.</p>
           )}
         </div>
+      </div>
+
+      {emails.length > 0 ? (
+        <div className="mt-4 card">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Engagement (last 30 days)
+          </div>
+          <Sparkline emails={emails} />
+        </div>
+      ) : null}
+
+      <div className="mt-4 card border-leo-200 bg-leo-50 dark:border-leo-900 dark:bg-leo-900/30">
+        <div className="text-xs font-semibold uppercase tracking-wide text-leo-700 dark:text-leo-200">
+          AI follow-up suggestions
+        </div>
+        <ul className="mt-2 list-disc pl-5 text-sm">
+          {followUpSuggestions().map((s, i) => (
+            <li key={i}>{s}</li>
+          ))}
+        </ul>
       </div>
 
       <div className="mt-6 grid gap-4 lg:grid-cols-2">
@@ -576,11 +688,13 @@ function EditableRow({
   v,
   onSave,
   multiline,
+  renderValue,
 }: {
   k: string;
   v: string;
   onSave: (val: string) => Promise<void>;
   multiline?: boolean;
+  renderValue?: (v: string) => React.ReactNode;
 }) {
   const [editing, setEditing] = useState(false);
   const [val, setVal] = useState(v);
@@ -641,7 +755,9 @@ function EditableRow({
       title="Click to edit"
     >
       <dt className="text-xs uppercase tracking-wide text-slate-400">{k}</dt>
-      {multiline ? (
+      {renderValue ? (
+        <dd>{v ? renderValue(v) : "—"}</dd>
+      ) : multiline ? (
         <dd className="whitespace-pre-wrap text-sm">{v || "—"}</dd>
       ) : (
         <dd className="text-sm">{v || "—"}</dd>
@@ -705,6 +821,43 @@ function ThreadCard({
           ))}
         </ol>
       ) : null}
+    </div>
+  );
+}
+
+function Sparkline({ emails }: { emails: EmailRecord[] }) {
+  const days = 30;
+  const sentByDay = new Map<string, { sent: number; replied: number }>();
+  for (const e of emails) {
+    if (!e.sentAt) continue;
+    const k = e.sentAt.slice(0, 10);
+    const cur = sentByDay.get(k) ?? { sent: 0, replied: 0 };
+    cur.sent++;
+    if (e.repliedAt) cur.replied++;
+    sentByDay.set(k, cur);
+  }
+  const cells: { date: string; sent: number; replied: number }[] = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const k = d.toISOString().slice(0, 10);
+    const c = sentByDay.get(k) ?? { sent: 0, replied: 0 };
+    cells.push({ date: k, ...c });
+  }
+  const max = Math.max(1, ...cells.map((c) => c.sent));
+  return (
+    <div className="mt-2 flex h-12 items-end gap-[2px]">
+      {cells.map((c) => (
+        <div
+          key={c.date}
+          title={`${c.date}: ${c.sent} sent, ${c.replied} replied`}
+          className="flex-1 rounded-sm bg-leo-500"
+          style={{
+            height: `${Math.max(4, (c.sent / max) * 100)}%`,
+            opacity: c.sent === 0 ? 0.1 : c.replied > 0 ? 1 : 0.5,
+          }}
+        />
+      ))}
     </div>
   );
 }

@@ -235,6 +235,64 @@ export default function ContactsPage() {
     }
   }
 
+  async function bulkAutoTagByDomain() {
+    if (selected.size === 0) return;
+    setBulkBusy("autotag");
+    try {
+      for (const id of selected) {
+        const c = contacts.find((c) => c.id === id);
+        if (!c) continue;
+        const m = c.email.match(/@(.+)$/);
+        if (!m) continue;
+        const domain = m[1].split(".")[0];
+        const merged = c.tags
+          ? Array.from(
+              new Set(
+                c.tags
+                  .split(",")
+                  .map((t) => t.trim())
+                  .concat(domain),
+              ),
+            ).join(", ")
+          : domain;
+        await api.patch(`/api/contacts/${id}`, { tags: merged });
+      }
+      ui.toast(`Auto-tagged ${selected.size} contact(s) by domain.`, {
+        kind: "success",
+      });
+      setSelected(new Set());
+      await load();
+    } finally {
+      setBulkBusy(null);
+    }
+  }
+
+  async function findDuplicates() {
+    const groups = new Map<string, Contact[]>();
+    for (const c of contacts) {
+      const m = c.email.match(/@(.+)$/);
+      const domain = m ? m[1].toLowerCase() : "";
+      const nameKey = (c.name || "").trim().toLowerCase().split(/\s+/)[0];
+      if (!nameKey || !domain) continue;
+      const key = `${nameKey}|${domain}`;
+      const list = groups.get(key) ?? [];
+      list.push(c);
+      groups.set(key, list);
+    }
+    const dupes = Array.from(groups.values()).filter((g) => g.length > 1);
+    if (dupes.length === 0) {
+      ui.toast("No duplicates detected.");
+      return;
+    }
+    const ids = new Set<string>();
+    for (const g of dupes) for (const c of g) ids.add(c.id);
+    setSelected(ids);
+    ui.toast(
+      `Found ${dupes.length} duplicate group(s) — ${ids.size} contacts selected.`,
+      { kind: "success" },
+    );
+  }
+
   async function bulkTag() {
     if (selected.size === 0) return;
     const tag = window.prompt("Tag to add (comma-separated values are kept):");
@@ -322,6 +380,9 @@ export default function ContactsPage() {
         description="Stored as rows in your LeoCRM Google Sheet."
         actions={
           <>
+            <button onClick={findDuplicates} className="btn-secondary">
+              Find duplicates
+            </button>
             <button
               onClick={() => {
                 const merged = filtered.map((c) => {
@@ -359,6 +420,38 @@ export default function ContactsPage() {
           </>
         }
       />
+      <div className="mb-2 flex flex-wrap gap-1 text-xs">
+        <span className="text-slate-500 mr-1 self-center">Quick:</span>
+        <QuickChip label="Hot (≥80)" onClick={() => setFilter({ minScore: 80 })} />
+        <QuickChip
+          label="Replied"
+          onClick={() => setFilter({ tag: "replied" })}
+        />
+        <QuickChip
+          label="No emails yet"
+          onClick={() => setFilter({ stage: "new" })}
+        />
+        <QuickChip
+          label="Engaged"
+          onClick={() => setFilter({ stage: "engaged" })}
+        />
+        <QuickChip
+          label="Founders"
+          onClick={() => setFilter({ tag: "founder" })}
+        />
+        <QuickChip
+          label="Healthcare"
+          onClick={() => setFilter({ tag: "healthcare" })}
+        />
+        {(filter.q || filter.tag || filter.stage || filter.minScore) && (
+          <button
+            onClick={() => setFilter({})}
+            className="rounded-full bg-slate-200 px-2 py-1 hover:bg-slate-300 dark:bg-slate-800"
+          >
+            × Clear
+          </button>
+        )}
+      </div>
       <div className="mb-3 grid gap-2 md:grid-cols-4">
         <input
           className="input"
@@ -478,6 +571,13 @@ export default function ContactsPage() {
               {bulkBusy === "tag" ? "Tagging…" : "Add tag"}
             </button>
             <button
+              onClick={bulkAutoTagByDomain}
+              disabled={bulkBusy !== null}
+              className="btn-secondary py-1 text-xs"
+            >
+              {bulkBusy === "autotag" ? "Tagging…" : "Auto-tag by domain"}
+            </button>
+            <button
               onClick={bulkDelete}
               disabled={bulkBusy !== null}
               className="btn-secondary py-1 text-xs text-red-600"
@@ -575,17 +675,28 @@ export default function ContactsPage() {
                   >
                     {score || "—"}
                   </span>
-                  {lead ? (
-                    <span
-                      className={`badge hidden sm:inline-flex ${
-                        STAGE_COLOR[lead.stage] ??
-                        "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {lead.stage}
-                    </span>
-                  ) : null}
                 </Link>
+                {lead ? (
+                  <select
+                    value={lead.stage}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={async (e) => {
+                      const next = e.target.value;
+                      await api.patch(`/api/leads/${lead.id}`, { stage: next });
+                      await load();
+                    }}
+                    className={`hidden text-[10px] font-medium border-0 bg-transparent rounded ${
+                      STAGE_COLOR[lead.stage] ??
+                      "bg-slate-100 text-slate-700"
+                    } px-2 py-0.5 sm:inline-block`}
+                  >
+                    {LEAD_STAGES.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
               </div>
             );
           })
@@ -810,6 +921,23 @@ function ImportCsvModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+function QuickChip({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-full bg-slate-100 px-2 py-1 hover:bg-leo-100 hover:text-leo-700 dark:bg-slate-800 dark:hover:bg-leo-900/40 dark:hover:text-leo-200"
+    >
+      {label}
+    </button>
   );
 }
 
