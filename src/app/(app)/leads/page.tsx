@@ -64,14 +64,35 @@ export default function LeadsPage() {
                 <span className="text-xs text-slate-400">{items.length}</span>
               </div>
               <div className="space-y-2">
-                {items.map((r) => (
+                {items.map((r) => {
+                  const lastTs = r.lead.lastContactedAt
+                    ? new Date(r.lead.lastContactedAt).getTime()
+                    : 0;
+                  const stale =
+                    r.lead.stage !== "won" &&
+                    r.lead.stage !== "lost" &&
+                    lastTs > 0 &&
+                    Date.now() - lastTs > 14 * 24 * 3600 * 1000;
+                  return (
                   <div key={r.lead.id} className="card p-3">
-                    <Link
-                      href={`/contacts/${r.contact?.id ?? ""}`}
-                      className="block text-sm font-medium hover:text-leo-600"
-                    >
-                      {r.contact?.name || r.contact?.email || "Unknown"}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/contacts/${r.contact?.id ?? ""}`}
+                        className="block flex-1 truncate text-sm font-medium hover:text-leo-600"
+                      >
+                        {r.contact?.name || r.contact?.email || "Unknown"}
+                      </Link>
+                      {stale ? (
+                        <span
+                          className="badge bg-rose-100 text-[10px] text-rose-700"
+                          title={`No contact in ${Math.round(
+                            (Date.now() - lastTs) / (24 * 3600 * 1000),
+                          )}d`}
+                        >
+                          stale
+                        </span>
+                      ) : null}
+                    </div>
                     <div className="text-xs text-slate-500">
                       {r.contact?.company || r.lead.source}
                     </div>
@@ -90,7 +111,8 @@ export default function LeadsPage() {
                       )}
                     </div>
                   </div>
-                ))}
+                  );
+                })}
                 {items.length === 0 ? (
                   <div className="rounded-lg border border-dashed border-slate-300 p-3 text-center text-xs text-slate-400 dark:border-slate-700">
                     Empty

@@ -6,9 +6,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
 import { csvToContacts, type ParsedContact } from "@/lib/csv";
 import { downloadCsv, toCsv } from "@/lib/export";
-import type { Contact, Lead, SavedView, Sequence } from "@/lib/types";
+import { getPins, onPinsChange, togglePin } from "@/lib/pins";
+import type { Contact, Enrollment, Lead, SavedView, Sequence } from "@/lib/types";
 import { LEAD_STAGES, type LeadStage } from "@/lib/types";
 import { avatarClasses, avatarInitials } from "@/lib/ui";
+import { SkeletonRow } from "@/components/Skeleton";
+import { useUI } from "@/components/ui/UIProvider";
 
 interface ViewFilter {
   q?: string;
@@ -17,7 +20,16 @@ interface ViewFilter {
   minScore?: number;
 }
 
-type SortKey = "score" | "lastContacted" | "name";
+type SortKey = "smart" | "score" | "lastContacted" | "name";
+
+const STAGE_COLOR: Record<string, string> = {
+  new: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  contacted: "bg-sky-100 text-sky-700",
+  engaged: "bg-amber-100 text-amber-700",
+  qualified: "bg-violet-100 text-violet-700",
+  won: "bg-emerald-100 text-emerald-700",
+  lost: "bg-rose-100 text-rose-700",
+};
 
 function scoreBadgeClass(score: number) {
   if (score >= 80) return "bg-emerald-100 text-emerald-700";
@@ -31,10 +43,17 @@ export default function ContactsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [views, setViews] = useState<SavedView[]>([]);
   const [sequences, setSequences] = useState<Sequence[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [filter, setFilter] = useState<ViewFilter>({});
-  const [sort, setSort] = useState<SortKey>("score");
+  const [sort, setSort] = useState<SortKey>("smart");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState<string | null>(null);
+  const [pins, setPins] = useState<Set<string>>(new Set());
+  const ui = useUI();
+  useEffect(() => {
+    setPins(getPins());
+    return onPinsChange(() => setPins(getPins()));
+  }, []);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -52,16 +71,18 @@ export default function ContactsPage() {
   async function load() {
     setLoading(true);
     try {
-      const [c, l, v, s] = await Promise.all([
+      const [c, l, v, s, e] = await Promise.all([
         api.get<Contact[]>("/api/contacts"),
         api.get<Lead[]>("/api/leads"),
         api.get<SavedView[]>("/api/views"),
         api.get<Sequence[]>("/api/sequences"),
+        api.get<Enrollment[]>("/api/enrollments"),
       ]);
       setContacts(c);
       setLeads(l);
       setViews(v);
       setSequences(s);
+      setEnrollments(e);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -100,18 +121,56 @@ export default function ContactsPage() {
       }
       return true;
     });
+    function priority(c: Contact): number {
+      // Composite: AI score + engagement (replied) + recency, minus staleness.
+      const lead = leadByContact.get(c.id);
+      const score = Number(lead?.score || 0);
+      const stageBoost: Record<string, number> = {
+        engaged: 20,
+        qualified: 30,
+        contacted: 5,
+        new: 0,
+        won: -100,
+        lost: -100,
+      };
+      const stage = stageBoost[lead?.stage ?? "new"] ?? 0;
+      const lastTs = lead?.lastContactedAt
+        ? new Date(lead.lastContactedAt).getTime()
+        : 0;
+      const daysAgo = lastTs
+        ? (Date.now() - lastTs) / (24 * 3600 * 1000)
+        : 30;
+      const recency = Math.max(0, 20 - daysAgo);
+      return score + stage + recency;
+    }
     return list.slice().sort((a, b) => {
+      const pinDiff = (pins.has(b.id) ? 1 : 0) - (pins.has(a.id) ? 1 : 0);
+      if (pinDiff !== 0) return pinDiff;
       if (sort === "name") return (a.name || a.email).localeCompare(b.name || b.email);
       if (sort === "lastContacted") {
         const la = leadByContact.get(a.id)?.lastContactedAt || "";
         const lb = leadByContact.get(b.id)?.lastContactedAt || "";
         return lb.localeCompare(la);
       }
+      if (sort === "smart") return priority(b) - priority(a);
       const sa = Number(leadByContact.get(a.id)?.score || 0);
       const sb = Number(leadByContact.get(b.id)?.score || 0);
       return sb - sa;
     });
-  }, [contacts, filter, leadByContact, sort]);
+  }, [contacts, filter, leadByContact, sort, pins]);
+
+  const enrolledByContact = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of enrollments) {
+      if (e.status === "active") m.set(e.contactId, e.sequenceId);
+    }
+    return m;
+  }, [enrollments]);
+
+  const seqById = useMemo(
+    () => new Map(sequences.map((s) => [s.id, s])),
+    [sequences],
+  );
 
   function toggleSelected(id: string) {
     const next = new Set(selected);
@@ -146,6 +205,58 @@ export default function ContactsPage() {
         sequenceId,
         contactIds: Array.from(selected),
       });
+      ui.toast(`Enrolled ${selected.size} contact(s).`, { kind: "success" });
+      setSelected(new Set());
+      await load();
+    } finally {
+      setBulkBusy(null);
+    }
+  }
+
+  async function bulkDelete() {
+    if (selected.size === 0) return;
+    const okGo = await ui.confirm(
+      `Delete ${selected.size} contact(s) and their leads?`,
+      { confirmLabel: "Delete", danger: true },
+    );
+    if (!okGo) return;
+    setBulkBusy("delete");
+    try {
+      for (const id of selected) {
+        const lead = leads.find((l) => l.contactId === id);
+        if (lead) await api.del(`/api/leads/${lead.id}`);
+        await api.del(`/api/contacts/${id}`);
+      }
+      ui.toast(`Deleted ${selected.size} contact(s).`, { kind: "success" });
+      setSelected(new Set());
+      await load();
+    } finally {
+      setBulkBusy(null);
+    }
+  }
+
+  async function bulkTag() {
+    if (selected.size === 0) return;
+    const tag = window.prompt("Tag to add (comma-separated values are kept):");
+    if (!tag) return;
+    setBulkBusy("tag");
+    try {
+      for (const id of selected) {
+        const c = contacts.find((c) => c.id === id);
+        if (!c) continue;
+        const merged = c.tags
+          ? Array.from(
+              new Set(
+                c.tags
+                  .split(",")
+                  .map((t) => t.trim())
+                  .concat(tag),
+              ),
+            ).join(", ")
+          : tag;
+        await api.patch(`/api/contacts/${id}`, { tags: merged });
+      }
+      ui.toast(`Tagged ${selected.size} contact(s).`, { kind: "success" });
       setSelected(new Set());
       await load();
     } finally {
@@ -345,6 +456,7 @@ export default function ContactsPage() {
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
         >
+          <option value="smart">Sort: AI smart sort</option>
           <option value="score">Sort: score (high→low)</option>
           <option value="lastContacted">Sort: last contacted</option>
           <option value="name">Sort: name</option>
@@ -357,6 +469,20 @@ export default function ContactsPage() {
               className="btn-secondary py-1 text-xs"
             >
               {bulkBusy === "score" ? "Scoring…" : "AI score selected"}
+            </button>
+            <button
+              onClick={bulkTag}
+              disabled={bulkBusy !== null}
+              className="btn-secondary py-1 text-xs"
+            >
+              {bulkBusy === "tag" ? "Tagging…" : "Add tag"}
+            </button>
+            <button
+              onClick={bulkDelete}
+              disabled={bulkBusy !== null}
+              className="btn-secondary py-1 text-xs text-red-600"
+            >
+              {bulkBusy === "delete" ? "Deleting…" : "Delete"}
             </button>
             <select
               className="input w-auto py-1 text-xs"
@@ -379,12 +505,11 @@ export default function ContactsPage() {
         ) : null}
       </div>
 
+      {loading ? (
+        <SkeletonRow count={8} />
+      ) : (
       <div className="card divide-y divide-slate-200 p-0 dark:divide-slate-800">
-        {loading ? (
-          <div className="p-6 text-center text-sm text-slate-500">
-            Loading…
-          </div>
-        ) : filtered.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="p-6 text-center text-sm text-slate-500">
             No contacts match the current filter.
           </div>
@@ -392,6 +517,8 @@ export default function ContactsPage() {
           filtered.map((c) => {
             const lead = leadByContact.get(c.id);
             const score = Number(lead?.score || 0);
+            const seq = enrolledByContact.get(c.id);
+            const pinned = pins.has(c.id);
             return (
               <div
                 key={c.id}
@@ -404,6 +531,16 @@ export default function ContactsPage() {
                   onChange={() => toggleSelected(c.id)}
                   onClick={(e) => e.stopPropagation()}
                 />
+                <button
+                  onClick={() => togglePin(c.id)}
+                  className={`text-base leading-none ${
+                    pinned ? "text-amber-500" : "text-slate-300 hover:text-amber-500"
+                  }`}
+                  title={pinned ? "Unpin" : "Pin to top"}
+                  aria-label={pinned ? "Unpin contact" : "Pin contact"}
+                >
+                  {pinned ? "★" : "☆"}
+                </button>
                 <Link
                   href={`/contacts/${c.id}`}
                   className="flex flex-1 items-center gap-3 min-w-0"
@@ -424,6 +561,14 @@ export default function ContactsPage() {
                         c.email}
                     </div>
                   </div>
+                  {seq ? (
+                    <span
+                      className="badge hidden bg-leo-100 text-[10px] text-leo-700 sm:inline-flex"
+                      title={`Enrolled in ${seqById.get(seq)?.name ?? "sequence"}`}
+                    >
+                      ⟳ {seqById.get(seq)?.name?.split(" ")[0] ?? "sequence"}
+                    </span>
+                  ) : null}
                   <span
                     className={`badge ${scoreBadgeClass(score)}`}
                     title={lead?.scoreReason || ""}
@@ -431,7 +576,12 @@ export default function ContactsPage() {
                     {score || "—"}
                   </span>
                   {lead ? (
-                    <span className="badge hidden bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 sm:inline-flex">
+                    <span
+                      className={`badge hidden sm:inline-flex ${
+                        STAGE_COLOR[lead.stage] ??
+                        "bg-slate-100 text-slate-700"
+                      }`}
+                    >
                       {lead.stage}
                     </span>
                   ) : null}
@@ -441,6 +591,7 @@ export default function ContactsPage() {
           })
         )}
       </div>
+      )}
 
       {showImport ? (
         <ImportCsvModal

@@ -93,13 +93,43 @@ export default function TasksPage() {
         ))}
       </div>
 
-      <div className="card divide-y divide-slate-200 p-0 dark:divide-slate-800">
-        {filtered.length === 0 ? (
-          <div className="p-6 text-center text-sm text-slate-500">
-            No tasks.
-          </div>
-        ) : (
-          filtered.map((t) => {
+      {(() => {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const groups: Array<{ label: string; items: typeof filtered }> = [];
+        if (filter !== "done") {
+          const overdue = filtered.filter(
+            (t) => t.status === "open" && t.dueAt && t.dueAt < todayStr,
+          );
+          const today = filtered.filter(
+            (t) => t.status === "open" && t.dueAt === todayStr,
+          );
+          const upcoming = filtered.filter(
+            (t) => t.status === "open" && t.dueAt && t.dueAt > todayStr,
+          );
+          const noDue = filtered.filter(
+            (t) => t.status === "open" && !t.dueAt,
+          );
+          if (overdue.length) groups.push({ label: "Overdue", items: overdue });
+          if (today.length) groups.push({ label: "Today", items: today });
+          if (upcoming.length) groups.push({ label: "Upcoming", items: upcoming });
+          if (noDue.length) groups.push({ label: "No due date", items: noDue });
+        }
+        const done = filtered.filter((t) => t.status === "done");
+        if (done.length) groups.push({ label: "Done", items: done });
+        if (groups.length === 0) {
+          return (
+            <div className="card p-6 text-center text-sm text-slate-500">
+              No tasks.
+            </div>
+          );
+        }
+        return groups.map((g) => (
+          <div key={g.label} className="mb-3">
+            <div className="mb-1 px-1 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              {g.label} · {g.items.length}
+            </div>
+            <div className="card divide-y divide-slate-200 p-0 dark:divide-slate-800">
+              {g.items.map((t) => {
             const c = contactsById.get(t.contactId);
             const overdue =
               t.status === "open" &&
@@ -150,9 +180,11 @@ export default function TasksPage() {
                 </div>
               </div>
             );
-          })
-        )}
-      </div>
+          })}
+            </div>
+          </div>
+        ));
+      })()}
 
       {showAdd ? (
         <div className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 p-0 md:items-center md:p-6">

@@ -9,6 +9,7 @@ import { DemoBanner } from "./DemoBanner";
 import { CommandPalette } from "./CommandPalette";
 import { QuickAdd } from "./QuickAdd";
 import { GlobalShortcuts } from "./GlobalShortcuts";
+import { RecentlyViewed } from "./RecentlyViewed";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
@@ -83,6 +84,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
+        <RecentlyViewed />
         <div className="border-t border-slate-200 p-3 text-xs dark:border-slate-800">
           <div className="truncate font-medium">{userName}</div>
           <button

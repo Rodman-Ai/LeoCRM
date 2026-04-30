@@ -60,6 +60,8 @@ export default function SettingsPage() {
         <ThemeToggle />
       </div>
 
+      <SignatureCard />
+
       <div className="card space-y-3">
         <Row label="Account" value={data?.user?.email ?? ""} />
         {loading ? (
@@ -164,6 +166,38 @@ export default function SettingsPage() {
           </li>
         </ul>
       </div>
+    </div>
+  );
+}
+
+function SignatureCard() {
+  const [sig, setSig] = useState("");
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    setSig(window.localStorage.getItem("leocrm.compose.signature") ?? "");
+  }, []);
+  return (
+    <div className="card mb-4">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="text-sm font-semibold">Email signature</div>
+        {saved ? (
+          <span className="text-xs text-emerald-600">Saved</span>
+        ) : null}
+      </div>
+      <p className="mb-2 text-xs text-slate-500">
+        Auto-appended to the body when you send from Compose.
+      </p>
+      <textarea
+        className="input min-h-[100px] font-mono text-sm"
+        placeholder={"— You\nyourco.com"}
+        value={sig}
+        onChange={(e) => {
+          setSig(e.target.value);
+          window.localStorage.setItem("leocrm.compose.signature", e.target.value);
+          setSaved(true);
+          setTimeout(() => setSaved(false), 1200);
+        }}
+      />
     </div>
   );
 }

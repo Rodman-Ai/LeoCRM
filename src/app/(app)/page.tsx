@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import { PageHeader } from "@/components/PageHeader";
-import type { Contact, EmailRecord, Lead, Task } from "@/lib/types";
+import type { Activity, Contact, EmailRecord, Lead, Task } from "@/lib/types";
 import { LEAD_STAGES } from "@/lib/types";
 
 export default function DashboardPage() {
@@ -13,27 +13,34 @@ export default function DashboardPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [emails, setEmails] = useState<EmailRecord[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [activity, setActivity] = useState<Activity[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [c, l, e, t] = await Promise.all([
+  async function load() {
+    setRefreshing(true);
+    try {
+        const [c, l, e, t, a] = await Promise.all([
           api.get<Contact[]>("/api/contacts"),
           api.get<Lead[]>("/api/leads"),
           api.get<EmailRecord[]>("/api/emails"),
           api.get<Task[]>("/api/tasks"),
+          api.get<Activity[]>("/api/activity"),
         ]);
         setContacts(c);
         setLeads(l);
         setEmails(e);
         setTasks(t);
+        setActivity(a);
       } catch (err) {
         setError((err as Error).message);
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
-    })();
+  }
+  useEffect(() => {
+    load();
   }, []);
 
   const stageCounts = LEAD_STAGES.map((stage) => ({
@@ -51,6 +58,14 @@ export default function DashboardPage() {
         description="A snapshot of your pipeline and AI activity."
         actions={
           <>
+            <button
+              onClick={load}
+              disabled={refreshing}
+              className="btn-secondary"
+              title="Refresh data"
+            >
+              {refreshing ? "↻ …" : "↻ Refresh"}
+            </button>
             <SyncRepliesButton />
             <Link href="/compose" className="btn-primary">
               New AI email
@@ -156,6 +171,47 @@ export default function DashboardPage() {
             );
           });
         })()}
+      </div>
+
+      <h2 className="mt-8 mb-3 text-sm font-semibold text-slate-500">
+        Activity feed
+      </h2>
+      <div className="card divide-y divide-slate-200 p-0 dark:divide-slate-800">
+        {activity.length === 0 ? (
+          <div className="p-6 text-center text-sm text-slate-500">
+            No activity yet.
+          </div>
+        ) : (
+          activity
+            .slice()
+            .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+            .slice(0, 10)
+            .map((a) => {
+              const c = contacts.find((c) => c.id === a.contactId);
+              return (
+                <div key={a.id} className="flex items-start gap-3 p-3">
+                  <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-leo-500" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm">{a.summary}</p>
+                    <p className="text-xs text-slate-400">
+                      {c ? (
+                        <Link
+                          className="hover:text-leo-600"
+                          href={`/contacts/${c.id}`}
+                        >
+                          {c.name || c.email}
+                        </Link>
+                      ) : null}
+                      {c ? " · " : ""}
+                      {a.createdAt
+                        ? new Date(a.createdAt).toLocaleString()
+                        : ""}
+                    </p>
+                  </div>
+                </div>
+              );
+            })
+        )}
       </div>
 
       <h2 className="mt-8 mb-3 text-sm font-semibold text-slate-500">

@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
-import type { FormDef, Sequence } from "@/lib/types";
+import { useUI } from "@/components/ui/UIProvider";
+import type { Activity, FormDef, Sequence } from "@/lib/types";
 
 const ALL_FIELDS = [
   "name",
@@ -18,7 +19,9 @@ const ALL_FIELDS = [
 export default function FormsPage() {
   const [forms, setForms] = useState<FormDef[]>([]);
   const [sequences, setSequences] = useState<Sequence[]>([]);
+  const [activity, setActivity] = useState<Activity[]>([]);
   const [showAdd, setShowAdd] = useState(false);
+  const ui = useUI();
   const [form, setForm] = useState({
     name: "",
     slug: "",
@@ -31,13 +34,29 @@ export default function FormsPage() {
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    const [f, s] = await Promise.all([
+    const [f, s, a] = await Promise.all([
       api.get<FormDef[]>("/api/forms"),
       api.get<Sequence[]>("/api/sequences"),
+      api.get<Activity[]>("/api/activity"),
     ]);
     setForms(f);
     setSequences(s);
+    setActivity(a);
   }
+  const submissionCount = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const a of activity) {
+      if (a.type !== "form_submission") continue;
+      try {
+        const meta = a.meta ? (JSON.parse(a.meta) as { slug?: string }) : {};
+        if (!meta.slug) continue;
+        m.set(meta.slug, (m.get(meta.slug) ?? 0) + 1);
+      } catch {
+        // ignore
+      }
+    }
+    return m;
+  }, [activity]);
   useEffect(() => {
     load();
   }, []);
@@ -120,6 +139,22 @@ export default function FormsPage() {
                 >
                   Copy link
                 </button>
+                <div className="mt-2 flex items-center gap-3 text-xs">
+                  <span className="badge bg-emerald-100 text-emerald-700">
+                    {submissionCount.get(f.slug) ?? 0} submission
+                    {(submissionCount.get(f.slug) ?? 0) === 1 ? "" : "s"}
+                  </span>
+                  <button
+                    onClick={() => {
+                      const code = `<iframe src="${url}" width="480" height="600" frameborder="0"></iframe>`;
+                      navigator.clipboard?.writeText(code);
+                      ui.toast("Embed snippet copied", { kind: "success" });
+                    }}
+                    className="text-leo-600 hover:underline"
+                  >
+                    Copy embed
+                  </button>
+                </div>
                 <p className="mt-2 text-xs text-slate-400">
                   Fields: {(() => {
                     try {

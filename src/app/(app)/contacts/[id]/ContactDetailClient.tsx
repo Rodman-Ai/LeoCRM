@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
+import { pushRecent } from "@/lib/recents";
 import type { Activity, Contact, EmailRecord, Lead, Task } from "@/lib/types";
 import { LEAD_STAGES, type LeadStage } from "@/lib/types";
 
@@ -83,6 +84,15 @@ export default function ContactDetailPage() {
   useEffect(() => {
     load();
   }, [id]);
+  useEffect(() => {
+    if (contact) {
+      pushRecent({
+        id: contact.id,
+        label: contact.name || contact.email,
+        href: `/contacts/${contact.id}`,
+      });
+    }
+  }, [contact]);
 
   async function changeStage(stage: LeadStage) {
     if (!lead) return;
@@ -288,9 +298,27 @@ export default function ContactDetailPage() {
                 <Row k="Source" v={lead.source} />
                 <Row k="Score" v={String(lead.score)} />
                 <Row k="Why" v={lead.scoreReason} />
-                <Row k="Value" v={String(lead.value)} />
+                <EditableRow
+                  k="Value ($)"
+                  v={String(lead.value || "")}
+                  onSave={async (v) => {
+                    await api.patch(`/api/leads/${lead.id}`, {
+                      value: v.replace(/[^0-9.]/g, "") || "0",
+                    });
+                    await load();
+                  }}
+                />
                 <Row k="Last contacted" v={fmtDate(lead.lastContactedAt)} />
-                <Row k="Next action" v={lead.nextAction} />
+                <EditableRow
+                  k="Next action"
+                  v={lead.nextAction}
+                  onSave={async (v) => {
+                    await api.patch(`/api/leads/${lead.id}`, {
+                      nextAction: v,
+                    });
+                    await load();
+                  }}
+                />
                 <Row k="Owner" v={lead.owner} />
               </dl>
             </>

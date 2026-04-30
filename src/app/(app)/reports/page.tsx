@@ -269,6 +269,29 @@ export default function ReportsPage() {
         </p>
       ) : null}
 
+      {(() => {
+        const dowReplyRate = days.map((label, i) => ({
+          label,
+          rate: dow[i] ? Math.round((dowReplies[i] / dow[i]) * 100) : 0,
+          sent: dow[i],
+        }));
+        const ranked = dowReplyRate
+          .filter((d) => d.sent >= 1)
+          .sort((a, b) => b.rate - a.rate);
+        const best = ranked[0];
+        if (!best) return null;
+        return (
+          <div className="card mt-4 flex items-center gap-3 border-leo-200 bg-leo-50 text-sm dark:border-leo-900 dark:bg-leo-900/30">
+            <span className="badge bg-leo-600 text-white">Insight</span>
+            <span>
+              <span className="font-semibold">{best.label}</span> has your
+              highest reply rate ({best.rate}% across {best.sent} sends). Try
+              concentrating outreach there.
+            </span>
+          </div>
+        );
+      })()}
+
       <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
         Sends by day of week
       </h2>

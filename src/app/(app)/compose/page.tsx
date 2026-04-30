@@ -14,10 +14,14 @@ export default function ComposePage() {
   );
 }
 
+const DRAFT_KEY = "leocrm.compose.draft";
+const SIG_KEY = "leocrm.compose.signature";
+
 function ComposeInner() {
   const search = useSearchParams();
   const router = useRouter();
   const initialId = search.get("contactId") ?? "";
+  const [signature, setSignature] = useState("");
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [contactId, setContactId] = useState(initialId);
@@ -47,7 +51,39 @@ function ComposeInner() {
       setTemplates(t);
       if (!initialId && c.length > 0) setContactId(c[0].id);
     })();
+    if (typeof window !== "undefined") {
+      setSignature(window.localStorage.getItem(SIG_KEY) ?? "");
+      const draftRaw = window.localStorage.getItem(DRAFT_KEY);
+      if (draftRaw) {
+        try {
+          const d = JSON.parse(draftRaw) as {
+            subject: string;
+            body: string;
+            contactId: string;
+          };
+          if (d.subject) setSubject(d.subject);
+          if (d.body) setBody(d.body);
+          if (d.contactId && !initialId) setContactId(d.contactId);
+        } catch {
+          // ignore
+        }
+      }
+    }
   }, [initialId]);
+
+  // Auto-save draft
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const t = setTimeout(() => {
+      if (subject || body) {
+        window.localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ subject, body, contactId }),
+        );
+      }
+    }, 400);
+    return () => clearTimeout(t);
+  }, [subject, body, contactId]);
 
   const contact = contacts.find((c) => c.id === contactId);
 
@@ -105,16 +141,20 @@ function ComposeInner() {
     setInfo(null);
     const useB = abTest && subjectB && chosenVariant === "B";
     const finalSubject = useB ? subjectB : subject;
+    const finalBody = signature ? `${body}\n\n${signature}` : body;
     try {
       await api.post("/api/email/send", {
         contactId: contact.id,
         to: contact.email,
         subject: finalSubject,
-        body,
+        body: finalBody,
         aiGenerated: aiUsed,
         prompt: aiUsed ? `${goal} (tone: ${tone})` : "",
         variant: abTest ? chosenVariant : "",
       });
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem(DRAFT_KEY);
+      }
       setInfo(`Sent to ${contact.email}.`);
       setTimeout(() => router.push(`/contacts/${contact.id}`), 600);
     } catch (err) {
@@ -267,6 +307,28 @@ function ComposeInner() {
               onChange={(e) => setBody(e.target.value)}
             />
           </label>
+          {signature ? (
+            <p className="text-[11px] text-slate-400">
+              Signature appended at send time.
+            </p>
+          ) : null}
+          <p className="text-[11px] text-slate-400">
+            Draft auto-saves to your browser.{" "}
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.localStorage.removeItem(DRAFT_KEY);
+                }
+                setSubject("");
+                setSubjectB("");
+                setBody("");
+              }}
+              className="text-leo-600 hover:underline"
+            >
+              Clear draft
+            </button>
+          </p>
           <button
             className="btn-primary w-full"
             disabled={sending || !contact || !subject || !body}

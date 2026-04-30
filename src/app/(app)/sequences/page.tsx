@@ -1,9 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
-import type { Contact, Sequence, SequenceStep } from "@/lib/types";
+import type {
+  Contact,
+  EmailRecord,
+  Enrollment,
+  Sequence,
+  SequenceStep,
+} from "@/lib/types";
 
 interface SequenceWithSteps extends Sequence {
   steps: SequenceStep[];
@@ -12,19 +18,50 @@ interface SequenceWithSteps extends Sequence {
 export default function SequencesPage() {
   const [sequences, setSequences] = useState<SequenceWithSteps[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [emails, setEmails] = useState<EmailRecord[]>([]);
   const [showBuilder, setShowBuilder] = useState(false);
   const [enrolling, setEnrolling] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [runMsg, setRunMsg] = useState<string | null>(null);
 
   async function load() {
-    const [s, c] = await Promise.all([
+    const [s, c, e, em] = await Promise.all([
       api.get<SequenceWithSteps[]>("/api/sequences"),
       api.get<Contact[]>("/api/contacts"),
+      api.get<Enrollment[]>("/api/enrollments"),
+      api.get<EmailRecord[]>("/api/emails"),
     ]);
     setSequences(s);
     setContacts(c);
+    setEnrollments(e);
+    setEmails(em);
   }
+
+  const statsBySeq = useMemo(() => {
+    const m = new Map<string, { active: number; completed: number; stopped: number; sent: number; replied: number }>();
+    for (const s of sequences) {
+      m.set(s.id, { active: 0, completed: 0, stopped: 0, sent: 0, replied: 0 });
+    }
+    for (const e of enrollments) {
+      const cur = m.get(e.sequenceId);
+      if (!cur) continue;
+      if (e.status === "active") cur.active++;
+      else if (e.status === "completed") cur.completed++;
+      else if (e.status === "stopped") cur.stopped++;
+    }
+    for (const em of emails) {
+      if (!em.sequenceEnrollmentId) continue;
+      const enr = enrollments.find((e) => e.id === em.sequenceEnrollmentId);
+      if (!enr) continue;
+      const cur = m.get(enr.sequenceId);
+      if (!cur) continue;
+      if (em.status === "sent") cur.sent++;
+      if (em.repliedAt) cur.replied++;
+    }
+    return m;
+  }, [sequences, enrollments, emails]);
   useEffect(() => {
     load();
   }, []);
@@ -88,6 +125,27 @@ export default function SequencesPage() {
                 </span>
               </div>
               <p className="mt-1 text-sm text-slate-500">{s.goal}</p>
+              {(() => {
+                const st = statsBySeq.get(s.id) ?? {
+                  active: 0,
+                  completed: 0,
+                  stopped: 0,
+                  sent: 0,
+                  replied: 0,
+                };
+                const rate = st.sent
+                  ? Math.round((st.replied / st.sent) * 100)
+                  : 0;
+                return (
+                  <div className="mt-3 grid grid-cols-5 gap-2 text-center">
+                    <Stat n="Active" v={st.active} />
+                    <Stat n="Done" v={st.completed} />
+                    <Stat n="Stopped" v={st.stopped} />
+                    <Stat n="Sent" v={st.sent} />
+                    <Stat n="Reply %" v={`${rate}%`} />
+                  </div>
+                );
+              })()}
               <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm">
                 {s.steps.map((st) => (
                   <li key={st.id}>
@@ -101,6 +159,12 @@ export default function SequencesPage() {
                 ))}
               </ol>
               <div className="mt-3 flex flex-wrap justify-end gap-2">
+                <button
+                  className="btn-secondary"
+                  onClick={() => setPreviewing(s.id)}
+                >
+                  Preview step 1
+                </button>
                 <button
                   className="btn-secondary"
                   onClick={async () => {
@@ -155,6 +219,119 @@ export default function SequencesPage() {
           }}
         />
       ) : null}
+
+      {previewing ? (
+        <PreviewModal
+          sequence={sequences.find((s) => s.id === previewing)!}
+          contacts={contacts}
+          onClose={() => setPreviewing(null)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function Stat({ n, v }: { n: string; v: string | number }) {
+  return (
+    <div className="rounded-lg bg-slate-50 px-2 py-1 dark:bg-slate-800">
+      <div className="text-[10px] uppercase tracking-wide text-slate-500">
+        {n}
+      </div>
+      <div className="text-sm font-semibold">{v}</div>
+    </div>
+  );
+}
+
+function PreviewModal({
+  sequence,
+  contacts,
+  onClose,
+}: {
+  sequence: SequenceWithSteps;
+  contacts: Contact[];
+  onClose: () => void;
+}) {
+  const [contactId, setContactId] = useState(contacts[0]?.id ?? "");
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState<{ subject: string; body: string } | null>(null);
+
+  async function generate() {
+    const c = contacts.find((c) => c.id === contactId);
+    if (!c) return;
+    const step = sequence.steps[0];
+    if (!step) return;
+    setBusy(true);
+    try {
+      const res = await api.post<{ subject: string; body: string }>(
+        "/api/ai/generate",
+        {
+          contact: {
+            name: c.name,
+            email: c.email,
+            company: c.company,
+            role: c.role,
+            tags: c.tags,
+            notes: c.notes,
+          },
+          goal: step.instructions || sequence.goal,
+          tone: sequence.tone,
+          context: `Step 1 of sequence "${sequence.name}". Subject hint: ${step.subjectHint || "(none)"}.`,
+        },
+      );
+      setPreview(res);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-30 flex items-end justify-center bg-black/40 p-0 md:items-center md:p-6"
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-xl overflow-hidden rounded-t-2xl bg-white shadow-xl dark:bg-slate-900 md:rounded-2xl"
+      >
+        <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-800">
+          <h2 className="text-lg font-semibold">Preview step 1</h2>
+          <button onClick={onClose} className="text-sm text-slate-400">
+            Close
+          </button>
+        </div>
+        <div className="space-y-3 p-4">
+          <label className="block">
+            <span className="label">Render for</span>
+            <select
+              className="input"
+              value={contactId}
+              onChange={(e) => setContactId(e.target.value)}
+            >
+              {contacts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name || c.email}
+                  {c.company ? ` · ${c.company}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            onClick={generate}
+            disabled={busy || !contactId}
+            className="btn-primary w-full"
+          >
+            {busy ? "Generating…" : "Generate preview"}
+          </button>
+          {preview ? (
+            <div className="rounded-lg border border-slate-200 p-3 text-sm dark:border-slate-700">
+              <div className="font-medium">{preview.subject}</div>
+              <pre className="mt-2 whitespace-pre-wrap break-words text-slate-700 dark:text-slate-200">
+                {preview.body}
+              </pre>
+            </div>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }

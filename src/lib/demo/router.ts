@@ -100,6 +100,7 @@ async function dispatch(ctx: RouteCtx): Promise<unknown> {
   if (pathname === "/api/sequences") return sequencesList(method, body);
   if (pathname === "/api/sequences/enroll") return sequencesEnroll(body);
   if (pathname === "/api/sequences/run") return sequencesRun();
+  if (pathname === "/api/enrollments") return readTable("enrollments");
   const seqMatch = pathname.match(/^\/api\/sequences\/([^/]+)$/);
   if (seqMatch) {
     const seqs = readTable<Sequence>("sequences");
