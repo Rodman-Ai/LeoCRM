@@ -5,11 +5,21 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
 import { csvToContacts, type ParsedContact } from "@/lib/csv";
-import type { Contact } from "@/lib/types";
+import type { Contact, Lead, SavedView } from "@/lib/types";
+import { LEAD_STAGES, type LeadStage } from "@/lib/types";
+
+interface ViewFilter {
+  q?: string;
+  tag?: string;
+  stage?: LeadStage | "";
+  minScore?: number;
+}
 
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [query, setQuery] = useState("");
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [views, setViews] = useState<SavedView[]>([]);
+  const [filter, setFilter] = useState<ViewFilter>({});
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -27,7 +37,14 @@ export default function ContactsPage() {
   async function load() {
     setLoading(true);
     try {
-      setContacts(await api.get<Contact[]>("/api/contacts"));
+      const [c, l, v] = await Promise.all([
+        api.get<Contact[]>("/api/contacts"),
+        api.get<Lead[]>("/api/leads"),
+        api.get<SavedView[]>("/api/views"),
+      ]);
+      setContacts(c);
+      setLeads(l);
+      setViews(v);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -38,16 +55,58 @@ export default function ContactsPage() {
     load();
   }, []);
 
+  const leadByContact = useMemo(
+    () => new Map(leads.map((l) => [l.contactId, l])),
+    [leads],
+  );
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return contacts;
-    return contacts.filter((c) =>
-      [c.name, c.email, c.company, c.role, c.tags]
-        .join(" ")
-        .toLowerCase()
-        .includes(q),
-    );
-  }, [contacts, query]);
+    const q = (filter.q ?? "").trim().toLowerCase();
+    const tag = (filter.tag ?? "").trim().toLowerCase();
+    return contacts.filter((c) => {
+      if (
+        q &&
+        ![c.name, c.email, c.company, c.role, c.tags]
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      )
+        return false;
+      if (tag && !c.tags.toLowerCase().includes(tag)) return false;
+      if (filter.stage) {
+        const lead = leadByContact.get(c.id);
+        if (!lead || lead.stage !== filter.stage) return false;
+      }
+      if (filter.minScore !== undefined) {
+        const lead = leadByContact.get(c.id);
+        if (!lead || Number(lead.score || 0) < filter.minScore) return false;
+      }
+      return true;
+    });
+  }, [contacts, filter, leadByContact]);
+
+  function applyView(v: SavedView) {
+    try {
+      const f = JSON.parse(v.filter) as ViewFilter;
+      setFilter(f);
+    } catch {
+      // ignore malformed filter
+    }
+  }
+
+  async function saveView() {
+    const name = window.prompt("Name this view:");
+    if (!name) return;
+    await api.post("/api/views", { name, filter });
+    const v = await api.get<SavedView[]>("/api/views");
+    setViews(v);
+  }
+
+  async function removeView(id: string) {
+    if (!confirm("Delete this saved view?")) return;
+    await api.del(`/api/views?id=${id}`);
+    setViews((v) => v.filter((x) => x.id !== id));
+  }
 
   async function submit() {
     setBusy(true);
@@ -96,13 +155,79 @@ export default function ContactsPage() {
           </>
         }
       />
-      <div className="mb-3">
+      <div className="mb-3 grid gap-2 md:grid-cols-4">
         <input
           className="input"
-          placeholder="Search by name, email, company…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search…"
+          value={filter.q ?? ""}
+          onChange={(e) => setFilter({ ...filter, q: e.target.value })}
         />
+        <input
+          className="input"
+          placeholder="Tag contains…"
+          value={filter.tag ?? ""}
+          onChange={(e) => setFilter({ ...filter, tag: e.target.value })}
+        />
+        <select
+          className="input"
+          value={filter.stage ?? ""}
+          onChange={(e) =>
+            setFilter({ ...filter, stage: e.target.value as LeadStage | "" })
+          }
+        >
+          <option value="">All stages</option>
+          {LEAD_STAGES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        <input
+          type="number"
+          className="input"
+          placeholder="Min score (0-100)"
+          value={filter.minScore ?? ""}
+          onChange={(e) =>
+            setFilter({
+              ...filter,
+              minScore: e.target.value ? Number(e.target.value) : undefined,
+            })
+          }
+        />
+      </div>
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-slate-500">Views:</span>
+        {views.map((v) => (
+          <span
+            key={v.id}
+            className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-800"
+          >
+            <button
+              onClick={() => applyView(v)}
+              className="font-medium hover:text-leo-600"
+            >
+              {v.name}
+            </button>
+            <button
+              onClick={() => removeView(v.id)}
+              className="text-slate-400 hover:text-red-500"
+              aria-label="Delete view"
+            >
+              ×
+            </button>
+          </span>
+        ))}
+        <button onClick={saveView} className="text-leo-600 hover:underline">
+          + Save current as view
+        </button>
+        {(filter.q || filter.tag || filter.stage || filter.minScore) && (
+          <button
+            onClick={() => setFilter({})}
+            className="text-slate-500 hover:underline"
+          >
+            Clear
+          </button>
+        )}
       </div>
 
       {error ? (

@@ -22,11 +22,11 @@ export function objectToRow(headers: string[], obj: Record<string, unknown>) {
   });
 }
 
-export async function readSheet(
+export async function readSheet<T = Record<string, string>>(
   clients: GoogleClients,
   spreadsheetId: string,
   schema: SheetSchema,
-): Promise<Record<string, string>[]> {
+): Promise<T[]> {
   const range = `${schema.title}!A2:${columnLetter(schema.headers.length)}`;
   const res = await clients.sheets.spreadsheets.values.get({
     spreadsheetId,
@@ -34,7 +34,17 @@ export async function readSheet(
     valueRenderOption: "UNFORMATTED_VALUE",
   });
   const values = (res.data.values ?? []) as string[][];
-  return rowsToObjects(schema.headers, values);
+  return rowsToObjectsAny<T>(schema.headers, values);
+}
+
+function rowsToObjectsAny<T>(headers: string[], rows: string[][]): T[] {
+  return rows.map((row) => {
+    const obj = {} as Record<string, string>;
+    headers.forEach((h, i) => {
+      obj[h] = row[i] ?? "";
+    });
+    return obj as unknown as T;
+  });
 }
 
 export async function appendRow(

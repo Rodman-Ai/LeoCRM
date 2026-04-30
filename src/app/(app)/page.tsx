@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api } from "@/lib/client";
 import { PageHeader } from "@/components/PageHeader";
-import type { Contact, EmailRecord, Lead } from "@/lib/types";
+import type { Contact, EmailRecord, Lead, Task } from "@/lib/types";
 import { LEAD_STAGES } from "@/lib/types";
 
 export default function DashboardPage() {
@@ -12,19 +12,22 @@ export default function DashboardPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [emails, setEmails] = useState<EmailRecord[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [c, l, e] = await Promise.all([
+        const [c, l, e, t] = await Promise.all([
           api.get<Contact[]>("/api/contacts"),
           api.get<Lead[]>("/api/leads"),
           api.get<EmailRecord[]>("/api/emails"),
+          api.get<Task[]>("/api/tasks"),
         ]);
         setContacts(c);
         setLeads(l);
         setEmails(e);
+        setTasks(t);
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -76,6 +79,71 @@ export default function DashboardPage() {
             <div className="mt-2 text-2xl font-semibold">{count}</div>
           </div>
         ))}
+      </div>
+
+      <h2 className="mt-8 mb-3 text-sm font-semibold text-slate-500">
+        Today
+      </h2>
+      <div className="card divide-y divide-slate-200 p-0 dark:divide-slate-800">
+        {(() => {
+          const open = tasks.filter((t) => t.status === "open");
+          if (open.length === 0) {
+            return (
+              <div className="p-6 text-center text-sm text-slate-500">
+                No open tasks. Add follow-ups from a contact's page or{" "}
+                <Link href="/tasks" className="text-leo-600">
+                  Tasks
+                </Link>
+                .
+              </div>
+            );
+          }
+          const sorted = open
+            .slice()
+            .sort((a, b) =>
+              (a.dueAt || "9999").localeCompare(b.dueAt || "9999"),
+            )
+            .slice(0, 6);
+          return sorted.map((t) => {
+            const c = contacts.find((c) => c.id === t.contactId);
+            const overdue =
+              t.dueAt && new Date(t.dueAt).getTime() < Date.now();
+            return (
+              <div key={t.id} className="flex items-center gap-3 p-3">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={false}
+                  onChange={async () => {
+                    await api.patch(`/api/tasks/${t.id}`, { status: "done" });
+                    setTasks(tasks.filter((x) => x.id !== t.id));
+                  }}
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="truncate text-sm font-medium">{t.title}</p>
+                    {overdue ? (
+                      <span className="badge bg-red-100 text-red-700">
+                        overdue
+                      </span>
+                    ) : null}
+                  </div>
+                  {c ? (
+                    <Link
+                      href={`/contacts/${c.id}`}
+                      className="text-xs text-slate-500 hover:text-leo-600"
+                    >
+                      {c.name || c.email}
+                    </Link>
+                  ) : null}
+                </div>
+                <div className="text-xs text-slate-400">
+                  {t.dueAt ? new Date(t.dueAt).toLocaleDateString() : ""}
+                </div>
+              </div>
+            );
+          });
+        })()}
       </div>
 
       <h2 className="mt-8 mb-3 text-sm font-semibold text-slate-500">

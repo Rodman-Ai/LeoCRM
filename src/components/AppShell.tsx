@@ -6,13 +6,26 @@ import { signOut, useSession } from "next-auth/react";
 import { ReactNode } from "react";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: "" },
-  { href: "/contacts", label: "Contacts", icon: "" },
-  { href: "/leads", label: "Pipeline", icon: "" },
-  { href: "/campaigns", label: "Campaigns", icon: "" },
-  { href: "/compose", label: "AI Compose", icon: "" },
-  { href: "/templates", label: "Templates", icon: "" },
-  { href: "/settings", label: "Settings", icon: "" },
+  { href: "/", label: "Dashboard" },
+  { href: "/contacts", label: "Contacts" },
+  { href: "/companies", label: "Companies" },
+  { href: "/leads", label: "Pipeline" },
+  { href: "/sequences", label: "Sequences" },
+  { href: "/campaigns", label: "Campaigns" },
+  { href: "/compose", label: "AI Compose" },
+  { href: "/tasks", label: "Tasks" },
+  { href: "/reports", label: "Reports" },
+  { href: "/templates", label: "Templates" },
+  { href: "/forms", label: "Forms" },
+  { href: "/settings", label: "Settings" },
+];
+
+const MOBILE_NAV = [
+  { href: "/", label: "Home" },
+  { href: "/contacts", label: "Contacts" },
+  { href: "/leads", label: "Pipeline" },
+  { href: "/compose", label: "Compose" },
+  { href: "/tasks", label: "Tasks" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -76,7 +89,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {children}
         </main>
         <nav className="fixed inset-x-0 bottom-0 z-10 grid grid-cols-5 border-t border-slate-200 bg-white text-xs dark:border-slate-800 dark:bg-slate-950 md:hidden">
-          {NAV.slice(0, 5).map((n) => {
+          {MOBILE_NAV.map((n) => {
             const active = n.href === "/" ? path === "/" : path.startsWith(n.href);
             return (
               <Link
