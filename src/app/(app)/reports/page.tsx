@@ -69,12 +69,32 @@ export default function ReportsPage() {
         description="Conversion funnel, AI vs non-AI reply rates, and send timing."
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Stat label="Sent" value={sent.length} />
         <Stat label="Replies" value={replied.length} />
         <Stat
           label="Reply rate"
           value={`${rate(sent.length, replied.length)}%`}
+        />
+        <Stat
+          label="Avg time-to-reply"
+          value={(() => {
+            const diffs = replied
+              .map((e) => {
+                if (!e.sentAt || !e.repliedAt) return null;
+                return (
+                  new Date(e.repliedAt).getTime() -
+                  new Date(e.sentAt).getTime()
+                );
+              })
+              .filter((n): n is number => typeof n === "number" && n > 0);
+            if (diffs.length === 0) return "—";
+            const avg = diffs.reduce((s, n) => s + n, 0) / diffs.length;
+            const hours = avg / 3600000;
+            return hours < 24
+              ? `${hours.toFixed(1)}h`
+              : `${(hours / 24).toFixed(1)}d`;
+          })()}
         />
         <Stat
           label="AI-generated"

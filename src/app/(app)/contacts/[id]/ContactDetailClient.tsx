@@ -21,6 +21,46 @@ export default function ContactDetailPage() {
   const [showTask, setShowTask] = useState(false);
   const [scoring, setScoring] = useState(false);
   const [taskForm, setTaskForm] = useState({ title: "", dueAt: "" });
+  const [activityFilter, setActivityFilter] = useState<
+    "all" | "emails" | "stage" | "tasks"
+  >("all");
+  const [summarizing, setSummarizing] = useState(false);
+  const [summary, setSummary] = useState<string | null>(null);
+
+  function summarizeContact() {
+    if (!contact) return;
+    setSummarizing(true);
+    // Synthesize a summary from the data we already have. Stays static-friendly.
+    setTimeout(() => {
+      const stage = lead?.stage ?? "—";
+      const score = lead?.score ?? "—";
+      const sent = emails.length;
+      const replies = emails.filter((e) => e.repliedAt).length;
+      const lastEmail =
+        emails
+          .slice()
+          .sort((a, b) => (b.sentAt || "").localeCompare(a.sentAt || ""))[0];
+      const openTasks = tasks.filter((t) => t.status === "open").length;
+      const lines = [
+        `${contact.name || contact.email}` +
+          (contact.role ? `, ${contact.role}` : "") +
+          (contact.company ? ` at ${contact.company}` : "") +
+          ".",
+        `Stage: ${stage}. AI score: ${score}${
+          lead?.scoreReason ? ` (${lead.scoreReason})` : ""
+        }.`,
+        `${sent} email${sent === 1 ? "" : "s"} sent, ${replies} repl${
+          replies === 1 ? "y" : "ies"
+        }.${lastEmail ? ` Last: "${lastEmail.subject}".` : ""}`,
+        openTasks
+          ? `${openTasks} open task${openTasks === 1 ? "" : "s"}.`
+          : "No open tasks.",
+        contact.notes ? `Notes: ${contact.notes}` : "",
+      ].filter(Boolean);
+      setSummary(lines.join(" "));
+      setSummarizing(false);
+    }, 350);
+  }
 
   async function load() {
     try {
@@ -229,28 +269,76 @@ export default function ContactDetailPage() {
           </div>
         </div>
         <div>
-          <h3 className="mb-2 text-sm font-semibold">Activity</h3>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold">Activity</h3>
+            <button
+              onClick={summarizeContact}
+              disabled={summarizing}
+              className="text-xs text-leo-600 hover:underline"
+            >
+              {summarizing ? "Summarizing…" : "AI summarize"}
+            </button>
+          </div>
+          {summary ? (
+            <div className="card mb-2 border-leo-200 bg-leo-50 text-sm dark:border-leo-900 dark:bg-leo-900/30">
+              {summary}
+            </div>
+          ) : null}
+          <div className="mb-2 flex flex-wrap gap-1 text-xs">
+            {(["all", "emails", "stage", "tasks"] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setActivityFilter(f)}
+                className={`rounded-full px-2 py-1 ${
+                  activityFilter === f
+                    ? "bg-leo-600 text-white"
+                    : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
           <div className="card p-0">
-            {activity.length === 0 ? (
-              <div className="p-4 text-center text-sm text-slate-500">
-                No activity yet.
-              </div>
-            ) : (
-              <ol className="relative space-y-3 p-4">
-                {activity.map((a) => (
-                  <li key={a.id} className="flex gap-3">
-                    <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-leo-500" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm">{a.summary}</p>
-                      <p className="text-xs text-slate-400">
-                        {fmtDate(a.createdAt)}
-                        {a.actor ? ` · ${a.actor}` : ""}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
+            {(() => {
+              const visible = activity.filter((a) => {
+                if (activityFilter === "all") return true;
+                if (activityFilter === "emails")
+                  return (
+                    a.type === "email_sent" || a.type === "email_replied"
+                  );
+                if (activityFilter === "stage")
+                  return a.type === "stage_change";
+                if (activityFilter === "tasks")
+                  return (
+                    a.type === "task_created" || a.type === "task_completed"
+                  );
+                return true;
+              });
+              if (visible.length === 0) {
+                return (
+                  <div className="p-4 text-center text-sm text-slate-500">
+                    No activity in this filter.
+                  </div>
+                );
+              }
+              return (
+                <ol className="relative space-y-3 p-4">
+                  {visible.map((a) => (
+                    <li key={a.id} className="flex gap-3">
+                      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-leo-500" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm">{a.summary}</p>
+                        <p className="text-xs text-slate-400">
+                          {fmtDate(a.createdAt)}
+                          {a.actor ? ` · ${a.actor}` : ""}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ol>
+              );
+            })()}
           </div>
         </div>
       </div>

@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { ReactNode } from "react";
 import { DEMO_MODE } from "@/lib/client";
+import { DemoBanner } from "./DemoBanner";
+import { CommandPalette } from "./CommandPalette";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
@@ -49,7 +51,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="flex min-h-screen w-full">
+    <div className="flex min-h-screen w-full flex-col">
+      <DemoBanner />
+      <CommandPalette />
+      <div className="flex min-h-0 flex-1">
       <aside className="hidden w-60 shrink-0 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 md:flex md:flex-col">
         <div className="flex h-14 items-center gap-2 px-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-leo-600 text-sm font-bold text-white">
@@ -119,6 +124,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
+      </div>
       </div>
     </div>
   );

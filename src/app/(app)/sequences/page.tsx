@@ -100,12 +100,33 @@ export default function SequencesPage() {
                   </li>
                 ))}
               </ol>
-              <div className="mt-3 flex justify-end gap-2">
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
+                <button
+                  className="btn-secondary"
+                  onClick={async () => {
+                    await api.patch(`/api/sequences/${s.id}`, {
+                      status: s.status === "active" ? "paused" : "active",
+                    });
+                    await load();
+                  }}
+                >
+                  {s.status === "active" ? "Pause" : "Resume"}
+                </button>
                 <button
                   className="btn-secondary"
                   onClick={() => setEnrolling(s.id)}
                 >
                   Enroll contacts
+                </button>
+                <button
+                  className="btn-secondary"
+                  onClick={async () => {
+                    if (!confirm(`Delete sequence "${s.name}"?`)) return;
+                    await api.del(`/api/sequences/${s.id}`);
+                    await load();
+                  }}
+                >
+                  Delete
                 </button>
               </div>
             </div>

@@ -63,9 +63,18 @@ export default function DashboardPage() {
           {error}
         </div>
       ) : null}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Stat label="Contacts" value={contacts.length} loading={loading} />
         <Stat label="Active leads" value={leads.length} loading={loading} />
+        <Stat
+          label="Pipeline $"
+          value={loading ? "—" : fmtUSD(
+            leads
+              .filter((l) => l.stage !== "lost" && l.stage !== "won")
+              .reduce((s, l) => s + Number(l.value || 0), 0),
+          )}
+          loading={false}
+        />
         <Stat label="Emails sent" value={sent.length} loading={loading} />
         <Stat label="AI-generated" value={aiSent} loading={loading} />
       </div>
@@ -226,13 +235,19 @@ function SyncRepliesButton() {
   );
 }
 
+function fmtUSD(n: number) {
+  if (n >= 1000)
+    return `$${Math.round(n / 1000).toLocaleString()}k`;
+  return `$${n.toLocaleString()}`;
+}
+
 function Stat({
   label,
   value,
   loading,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   loading: boolean;
 }) {
   return (

@@ -100,6 +100,23 @@ async function dispatch(ctx: RouteCtx): Promise<unknown> {
   if (pathname === "/api/sequences") return sequencesList(method, body);
   if (pathname === "/api/sequences/enroll") return sequencesEnroll(body);
   if (pathname === "/api/sequences/run") return sequencesRun();
+  const seqMatch = pathname.match(/^\/api\/sequences\/([^/]+)$/);
+  if (seqMatch) {
+    const seqs = readTable<Sequence>("sequences");
+    const idx = seqs.findIndex((s) => s.id === seqMatch[1]);
+    if (method === "PATCH" && idx !== -1) {
+      seqs[idx] = { ...seqs[idx], ...(body ?? {}) } as Sequence;
+      writeTable("sequences", seqs);
+      return seqs[idx];
+    }
+    if (method === "DELETE") {
+      writeTable(
+        "sequences",
+        seqs.filter((s) => s.id !== seqMatch[1]),
+      );
+      return { deleted: true };
+    }
+  }
 
   // forms
   if (pathname === "/api/forms") return crud("forms", "f", ctx);

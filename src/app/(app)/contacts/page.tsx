@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
 import { csvToContacts, type ParsedContact } from "@/lib/csv";
-import type { Contact, Lead, SavedView } from "@/lib/types";
+import type { Contact, Lead, SavedView, Sequence } from "@/lib/types";
 import { LEAD_STAGES, type LeadStage } from "@/lib/types";
 
 interface ViewFilter {
@@ -15,11 +15,24 @@ interface ViewFilter {
   minScore?: number;
 }
 
+type SortKey = "score" | "lastContacted" | "name";
+
+function scoreBadgeClass(score: number) {
+  if (score >= 80) return "bg-emerald-100 text-emerald-700";
+  if (score >= 60) return "bg-amber-100 text-amber-700";
+  if (score > 0) return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
+  return "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500";
+}
+
 export default function ContactsPage() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [views, setViews] = useState<SavedView[]>([]);
+  const [sequences, setSequences] = useState<Sequence[]>([]);
   const [filter, setFilter] = useState<ViewFilter>({});
+  const [sort, setSort] = useState<SortKey>("score");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -37,14 +50,16 @@ export default function ContactsPage() {
   async function load() {
     setLoading(true);
     try {
-      const [c, l, v] = await Promise.all([
+      const [c, l, v, s] = await Promise.all([
         api.get<Contact[]>("/api/contacts"),
         api.get<Lead[]>("/api/leads"),
         api.get<SavedView[]>("/api/views"),
+        api.get<Sequence[]>("/api/sequences"),
       ]);
       setContacts(c);
       setLeads(l);
       setViews(v);
+      setSequences(s);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -63,7 +78,7 @@ export default function ContactsPage() {
   const filtered = useMemo(() => {
     const q = (filter.q ?? "").trim().toLowerCase();
     const tag = (filter.tag ?? "").trim().toLowerCase();
-    return contacts.filter((c) => {
+    const list = contacts.filter((c) => {
       if (
         q &&
         ![c.name, c.email, c.company, c.role, c.tags]
@@ -83,7 +98,58 @@ export default function ContactsPage() {
       }
       return true;
     });
-  }, [contacts, filter, leadByContact]);
+    return list.slice().sort((a, b) => {
+      if (sort === "name") return (a.name || a.email).localeCompare(b.name || b.email);
+      if (sort === "lastContacted") {
+        const la = leadByContact.get(a.id)?.lastContactedAt || "";
+        const lb = leadByContact.get(b.id)?.lastContactedAt || "";
+        return lb.localeCompare(la);
+      }
+      const sa = Number(leadByContact.get(a.id)?.score || 0);
+      const sb = Number(leadByContact.get(b.id)?.score || 0);
+      return sb - sa;
+    });
+  }, [contacts, filter, leadByContact, sort]);
+
+  function toggleSelected(id: string) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  }
+  function toggleAll() {
+    if (selected.size === filtered.length) setSelected(new Set());
+    else setSelected(new Set(filtered.map((c) => c.id)));
+  }
+
+  async function bulkScore() {
+    if (selected.size === 0) return;
+    setBulkBusy("score");
+    try {
+      for (const id of selected) {
+        await api.post("/api/ai/score", { contactId: id });
+      }
+      setSelected(new Set());
+      await load();
+    } finally {
+      setBulkBusy(null);
+    }
+  }
+
+  async function bulkEnroll(sequenceId: string) {
+    if (!sequenceId || selected.size === 0) return;
+    setBulkBusy("enroll");
+    try {
+      await api.post("/api/sequences/enroll", {
+        sequenceId,
+        contactIds: Array.from(selected),
+      });
+      setSelected(new Set());
+      await load();
+    } finally {
+      setBulkBusy(null);
+    }
+  }
 
   function applyView(v: SavedView) {
     try {
@@ -236,6 +302,56 @@ export default function ContactsPage() {
         </div>
       ) : null}
 
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
+        <label className="flex items-center gap-2 text-xs text-slate-500">
+          <input
+            type="checkbox"
+            checked={selected.size > 0 && selected.size === filtered.length}
+            onChange={toggleAll}
+          />
+          {selected.size > 0
+            ? `${selected.size} selected`
+            : `${filtered.length} contacts`}
+        </label>
+        <select
+          className="input ml-auto w-auto py-1 text-xs"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+        >
+          <option value="score">Sort: score (high→low)</option>
+          <option value="lastContacted">Sort: last contacted</option>
+          <option value="name">Sort: name</option>
+        </select>
+        {selected.size > 0 ? (
+          <>
+            <button
+              onClick={bulkScore}
+              disabled={bulkBusy !== null}
+              className="btn-secondary py-1 text-xs"
+            >
+              {bulkBusy === "score" ? "Scoring…" : "AI score selected"}
+            </button>
+            <select
+              className="input w-auto py-1 text-xs"
+              defaultValue=""
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v) bulkEnroll(v);
+                e.currentTarget.value = "";
+              }}
+              disabled={bulkBusy !== null}
+            >
+              <option value="">Enroll in sequence…</option>
+              {sequences.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </>
+        ) : null}
+      </div>
+
       <div className="card divide-y divide-slate-200 p-0 dark:divide-slate-800">
         {loading ? (
           <div className="p-6 text-center text-sm text-slate-500">
@@ -243,33 +359,55 @@ export default function ContactsPage() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="p-6 text-center text-sm text-slate-500">
-            No contacts yet.
+            No contacts match the current filter.
           </div>
         ) : (
-          filtered.map((c) => (
-            <Link
-              key={c.id}
-              href={`/contacts/${c.id}`}
-              className="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-900"
-            >
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-leo-100 text-xs font-semibold text-leo-700">
-                {(c.name || c.email || "?").slice(0, 1).toUpperCase()}
+          filtered.map((c) => {
+            const lead = leadByContact.get(c.id);
+            const score = Number(lead?.score || 0);
+            return (
+              <div
+                key={c.id}
+                className="flex items-center gap-3 p-3 hover:bg-slate-50 dark:hover:bg-slate-900"
+              >
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={selected.has(c.id)}
+                  onChange={() => toggleSelected(c.id)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <Link
+                  href={`/contacts/${c.id}`}
+                  className="flex flex-1 items-center gap-3 min-w-0"
+                >
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-leo-100 text-xs font-semibold text-leo-700">
+                    {(c.name || c.email || "?").slice(0, 1).toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">
+                      {c.name || c.email}
+                    </div>
+                    <div className="truncate text-xs text-slate-500">
+                      {[c.role, c.company].filter(Boolean).join(" · ") ||
+                        c.email}
+                    </div>
+                  </div>
+                  <span
+                    className={`badge ${scoreBadgeClass(score)}`}
+                    title={lead?.scoreReason || ""}
+                  >
+                    {score || "—"}
+                  </span>
+                  {lead ? (
+                    <span className="badge hidden bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 sm:inline-flex">
+                      {lead.stage}
+                    </span>
+                  ) : null}
+                </Link>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">
-                  {c.name || c.email}
-                </div>
-                <div className="truncate text-xs text-slate-500">
-                  {[c.role, c.company].filter(Boolean).join(" · ") || c.email}
-                </div>
-              </div>
-              {c.tags ? (
-                <span className="badge bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  {c.tags.split(",")[0]}
-                </span>
-              ) : null}
-            </Link>
-          ))
+            );
+          })
         )}
       </div>
 
