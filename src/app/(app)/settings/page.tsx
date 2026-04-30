@@ -10,16 +10,31 @@ interface Workspace {
   driveFolderId: string;
 }
 
+interface OwnerCreds {
+  LEOCRM_OWNER_EMAIL: string;
+  LEOCRM_SPREADSHEET_ID: string;
+  LEOCRM_DRIVE_FOLDER_ID: string;
+  LEOCRM_OWNER_REFRESH_TOKEN: string;
+  configured: boolean;
+}
+
 export default function SettingsPage() {
   const { data } = useSession();
   const [ws, setWs] = useState<Workspace | null>(null);
+  const [creds, setCreds] = useState<OwnerCreds | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showToken, setShowToken] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        setWs(await api.post<Workspace>("/api/setup", {}));
+        const [w, c] = await Promise.all([
+          api.post<Workspace>("/api/setup", {}),
+          api.get<OwnerCreds>("/api/owner-credentials"),
+        ]);
+        setWs(w);
+        setCreds(c);
       } catch (err) {
         setError((err as Error).message);
       } finally {
@@ -59,6 +74,63 @@ export default function SettingsPage() {
           </>
         ) : null}
       </div>
+      {creds ? (
+        <div className="card mt-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold">Public form credentials</h3>
+            <span
+              className={`badge ${
+                creds.configured
+                  ? "bg-emerald-100 text-emerald-700"
+                  : "bg-amber-100 text-amber-700"
+              }`}
+            >
+              {creds.configured ? "configured" : "not configured"}
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-slate-500">
+            Public form submissions are unauthenticated, so the server uses
+            stored OAuth credentials to write to your spreadsheet. Copy these
+            into your deployment&apos;s environment variables (Vercel → Project
+            → Settings → Environment Variables) and redeploy.
+          </p>
+          <div className="mt-3 space-y-2 font-mono text-xs">
+            <Env name="LEOCRM_OWNER_EMAIL" value={creds.LEOCRM_OWNER_EMAIL} />
+            <Env
+              name="LEOCRM_SPREADSHEET_ID"
+              value={creds.LEOCRM_SPREADSHEET_ID}
+            />
+            <Env
+              name="LEOCRM_DRIVE_FOLDER_ID"
+              value={creds.LEOCRM_DRIVE_FOLDER_ID}
+            />
+            <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold">
+                  LEOCRM_OWNER_REFRESH_TOKEN
+                </span>
+                <button
+                  onClick={() => setShowToken((s) => !s)}
+                  className="text-leo-600"
+                >
+                  {showToken ? "Hide" : "Reveal"}
+                </button>
+              </div>
+              <div className="mt-1 break-all">
+                {showToken
+                  ? creds.LEOCRM_OWNER_REFRESH_TOKEN || "(none on this session)"
+                  : "•".repeat(36)}
+              </div>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
+            Treat the refresh token like a password — it grants the same
+            Sheets/Drive/Gmail access you granted at sign-in. Store it only in
+            your own deployment&apos;s env config.
+          </p>
+        </div>
+      ) : null}
+
       <div className="card mt-4">
         <h3 className="mb-2 text-sm font-semibold">Where is my data?</h3>
         <ul className="list-inside list-disc space-y-1 text-sm text-slate-600 dark:text-slate-300">
@@ -81,6 +153,23 @@ export default function SettingsPage() {
           </li>
         </ul>
       </div>
+    </div>
+  );
+}
+
+function Env({ name, value }: { name: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800">
+      <div className="flex items-center justify-between">
+        <span className="font-semibold">{name}</span>
+        <button
+          onClick={() => navigator.clipboard?.writeText(value)}
+          className="text-leo-600"
+        >
+          Copy
+        </button>
+      </div>
+      <div className="mt-1 break-all">{value || "—"}</div>
     </div>
   );
 }
