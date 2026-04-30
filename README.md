@@ -84,12 +84,36 @@ You can verify in `/settings`, which links straight to both.
 
 ### 5. Deploy
 
-Deploys cleanly on Vercel:
+Two paths, both via GitHub Actions:
 
-- Set the same env vars in the Vercel project.
-- Update the Google OAuth client's authorized JS origin + redirect URI to the
-  production URL.
-- Set `NEXTAUTH_URL` to the production URL.
+**A) One-click via the bundled Vercel workflow** (`.github/workflows/deploy.yml`).
+Configure once, then every push to `main` ships to production and every other
+branch ships to a preview URL.
+
+1. `npm i -g vercel && vercel link` in the repo (or import the repo at
+   <https://vercel.com/new>). This creates `.vercel/project.json` with `orgId`
+   and `projectId`.
+2. Add the following **Repository Secrets** (Settings → Secrets and variables
+   → Actions → New repository secret):
+   - `VERCEL_TOKEN` — a personal token from <https://vercel.com/account/tokens>
+   - `VERCEL_ORG_ID` — from `.vercel/project.json`
+   - `VERCEL_PROJECT_ID` — from `.vercel/project.json`
+3. In the Vercel project's **Environment Variables**, add the same values
+   you set in `.env.local` (`NEXTAUTH_SECRET`, `GOOGLE_CLIENT_ID`,
+   `GOOGLE_CLIENT_SECRET`, `ANTHROPIC_API_KEY`, `NEXTAUTH_URL` set to the
+   production URL).
+4. In Google Cloud Console, add your Vercel production + preview URLs to
+   **Authorized JavaScript origins** and `…/api/auth/callback/google` to
+   **Authorized redirect URIs**.
+5. Push. The `Deploy to Vercel` workflow runs on every push and posts the
+   deploy URL to the job summary.
+
+If the secrets aren't set, the deploy workflow skips itself and prints
+instructions in the job summary — CI still runs (typecheck + build).
+
+**B) Direct Vercel/Netlify** — drop the GitHub Action and just import the repo
+in the Vercel/Netlify UI; both detect Next.js and "just work" with the env
+vars from step 3.
 
 ## Mobile
 

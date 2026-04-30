@@ -1,0 +1,84 @@
+name: Deploy to Vercel
+
+on:
+  push:
+    branches:
+      - main
+      - claude/ai-email-crm-google-vwLTr
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Vercel credentials
+        id: vercel
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "Vercel secrets not configured. Add VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID in repo Settings > Secrets and variables > Actions to enable deploy."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.vercel.outputs.configured == 'true'
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Vercel CLI
+        if: steps.vercel.outputs.configured == 'true'
+        run: npm install --global vercel@latest
+
+      - name: Determine environment
+        if: steps.vercel.outputs.configured == 'true'
+        id: env
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "name=production" >> "$GITHUB_OUTPUT"
+            echo "prod=--prod" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=preview" >> "$GITHUB_OUTPUT"
+            echo "prod=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pull Vercel environment
+        if: steps.vercel.outputs.configured == 'true'
+        run: vercel pull --yes --environment=${{ steps.env.outputs.name }} --token=$VERCEL_TOKEN
+
+      - name: Build
+        if: steps.vercel.outputs.configured == 'true'
+        run: vercel build ${{ steps.env.outputs.prod }} --token=$VERCEL_TOKEN
+
+      - name: Deploy
+        if: steps.vercel.outputs.configured == 'true'
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prebuilt ${{ steps.env.outputs.prod }} --token=$VERCEL_TOKEN)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed: $URL"
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ steps.vercel.outputs.configured }}" = "true" ]; then
+            echo " Deployed to ${{ steps.deploy.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "## Vercel deploy skipped" >> "$GITHUB_STEP_SUMMARY"
+            echo "Add the following Repository Secrets to enable automatic deploys:" >> "$GITHUB_STEP_SUMMARY"
+            echo "- \`VERCEL_TOKEN\` from <https://vercel.com/account/tokens>" >> "$GITHUB_STEP_SUMMARY"
+            echo "- \`VERCEL_ORG_ID\` and \`VERCEL_PROJECT_ID\` from \`vercel link\` output (.vercel/project.json)" >> "$GITHUB_STEP_SUMMARY"
+          fi

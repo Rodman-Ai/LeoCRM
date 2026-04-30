@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
+import { csvToContacts, type ParsedContact } from "@/lib/csv";
 import type { Contact } from "@/lib/types";
 
 export default function ContactsPage() {
@@ -11,6 +12,7 @@ export default function ContactsPage() {
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -81,9 +83,17 @@ export default function ContactsPage() {
         title="Contacts"
         description="Stored as rows in your LeoCRM Google Sheet."
         actions={
-          <button onClick={() => setShowAdd(true)} className="btn-primary">
-            Add contact
-          </button>
+          <>
+            <button
+              onClick={() => setShowImport(true)}
+              className="btn-secondary"
+            >
+              Import CSV
+            </button>
+            <button onClick={() => setShowAdd(true)} className="btn-primary">
+              Add contact
+            </button>
+          </>
         }
       />
       <div className="mb-3">
@@ -137,6 +147,16 @@ export default function ContactsPage() {
           ))
         )}
       </div>
+
+      {showImport ? (
+        <ImportCsvModal
+          onClose={() => setShowImport(false)}
+          onImported={async () => {
+            setShowImport(false);
+            await load();
+          }}
+        />
+      ) : null}
 
       {showAdd ? (
         <Modal onClose={() => setShowAdd(false)} title="Add contact">
@@ -223,6 +243,128 @@ function Field({
       <span className="label">{label}</span>
       {children}
     </label>
+  );
+}
+
+function ImportCsvModal({
+  onClose,
+  onImported,
+}: {
+  onClose: () => void;
+  onImported: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [parsed, setParsed] = useState<{
+    contacts: ParsedContact[];
+    skipped: number;
+    total: number;
+  } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [createLeads, setCreateLeads] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  function preview(t: string) {
+    setText(t);
+    if (!t.trim()) {
+      setParsed(null);
+      return;
+    }
+    setParsed(csvToContacts(t));
+  }
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const t = await f.text();
+    preview(t);
+  }
+
+  async function submit() {
+    if (!parsed || parsed.contacts.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.post("/api/contacts/bulk", {
+        contacts: parsed.contacts,
+        createLeads,
+        source: "csv-import",
+      });
+      onImported();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const sample = parsed?.contacts.slice(0, 5) ?? [];
+
+  return (
+    <Modal title="Import contacts from CSV" onClose={onClose}>
+      <div className="space-y-3">
+        <p className="text-xs text-slate-500">
+          Paste CSV or upload a file. We auto-map columns named{" "}
+          <span className="font-mono">email</span>,{" "}
+          <span className="font-mono">name</span>,{" "}
+          <span className="font-mono">company</span>,{" "}
+          <span className="font-mono">role</span>, plus phone, linkedin, tags,
+          notes. Email is required.
+        </p>
+        <input type="file" accept=".csv,text/csv" onChange={onFile} />
+        <textarea
+          className="input min-h-[120px] font-mono text-xs"
+          placeholder="email,name,company,role&#10;jane@acme.com,Jane Doe,Acme,VP Sales"
+          value={text}
+          onChange={(e) => preview(e.target.value)}
+        />
+        {parsed ? (
+          <div className="rounded-lg bg-slate-50 p-3 text-xs dark:bg-slate-800">
+            <div className="font-medium">
+              {parsed.contacts.length} valid · {parsed.total - parsed.contacts.length}{" "}
+              skipped (missing/invalid email)
+            </div>
+            {sample.length > 0 ? (
+              <ul className="mt-2 space-y-1">
+                {sample.map((c, i) => (
+                  <li key={i} className="truncate">
+                    {c.name || "—"} · {c.email}{" "}
+                    {c.company ? `(${c.company})` : ""}
+                  </li>
+                ))}
+                {parsed.contacts.length > sample.length ? (
+                  <li className="text-slate-400">
+                    …and {parsed.contacts.length - sample.length} more
+                  </li>
+                ) : null}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={createLeads}
+            onChange={(e) => setCreateLeads(e.target.checked)}
+          />
+          Also create a lead (stage: new) for each imported contact
+        </label>
+        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        <div className="flex justify-end gap-2 pt-2">
+          <button onClick={onClose} className="btn-secondary">
+            Cancel
+          </button>
+          <button
+            className="btn-primary"
+            disabled={busy || !parsed || parsed.contacts.length === 0}
+            onClick={submit}
+          >
+            {busy
+              ? "Importing…"
+              : `Import ${parsed?.contacts.length ?? 0} contacts`}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

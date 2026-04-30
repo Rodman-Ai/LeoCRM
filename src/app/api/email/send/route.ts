@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { withAuth, ok, bad, newId, nowIso } from "@/lib/api";
+import { logActivity } from "@/lib/activity";
 import { sendEmail } from "@/lib/google/gmail";
 import { SHEETS } from "@/lib/google/schema";
 import { appendRow, readSheet, updateRowById } from "@/lib/google/sheets";
@@ -15,6 +16,9 @@ export async function POST(req: NextRequest) {
     campaignId?: string;
     aiGenerated?: boolean;
     prompt?: string;
+    sequenceEnrollmentId?: string;
+    stepIndex?: number;
+    variant?: string;
   };
   if (!body.to || !body.subject || !body.body) {
     return bad("to, subject, body required");
@@ -40,6 +44,9 @@ export async function POST(req: NextRequest) {
     id: newId("e"),
     contactId: body.contactId ?? "",
     campaignId: body.campaignId ?? "",
+    sequenceEnrollmentId: body.sequenceEnrollmentId ?? "",
+    stepIndex: body.stepIndex !== undefined ? String(body.stepIndex) : "",
+    variant: body.variant ?? "",
     subject: body.subject,
     body: body.body,
     sentAt: nowIso(),
@@ -47,6 +54,7 @@ export async function POST(req: NextRequest) {
     aiGenerated: body.aiGenerated ? "yes" : "no",
     prompt: body.prompt ?? "",
     threadId,
+    repliedAt: "",
   };
   await appendRow(
     r.ctx.clients,
@@ -55,8 +63,19 @@ export async function POST(req: NextRequest) {
     record,
   );
 
-  // Update contact lead's lastContactedAt + stage if applicable
   if (body.contactId && status === "sent") {
+    await logActivity(r.ctx.clients, r.ctx.workspace.spreadsheetId, {
+      contactId: body.contactId,
+      type: "email_sent",
+      summary: `Sent: ${body.subject}`,
+      meta: {
+        threadId,
+        variant: body.variant,
+        sequenceEnrollmentId: body.sequenceEnrollmentId,
+      },
+      actor: r.ctx.email,
+    });
+
     const leads = await readSheet(
       r.ctx.clients,
       r.ctx.workspace.spreadsheetId,
@@ -64,6 +83,15 @@ export async function POST(req: NextRequest) {
     );
     const lead = leads.find((l) => l.contactId === body.contactId);
     if (lead) {
+      const nextStage = lead.stage === "new" ? "contacted" : lead.stage;
+      if (nextStage !== lead.stage) {
+        await logActivity(r.ctx.clients, r.ctx.workspace.spreadsheetId, {
+          contactId: body.contactId,
+          type: "stage_change",
+          summary: `Stage: ${lead.stage} → ${nextStage}`,
+          actor: r.ctx.email,
+        });
+      }
       await updateRowById(
         r.ctx.clients,
         r.ctx.workspace.spreadsheetId,
@@ -71,12 +99,12 @@ export async function POST(req: NextRequest) {
         lead.id,
         {
           lastContactedAt: nowIso(),
-          stage: lead.stage === "new" ? "contacted" : lead.stage,
+          stage: nextStage,
           updatedAt: nowIso(),
         },
       );
     }
-    // Also bump campaign sent count
+
     if (body.campaignId) {
       const campaigns = await readSheet(
         r.ctx.clients,

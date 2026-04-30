@@ -35,6 +35,7 @@ export interface Lead {
   source: string;
   stage: LeadStage;
   score: number;
+  scoreReason: string;
   value: number;
   owner: string;
   lastContactedAt: string;
@@ -61,6 +62,9 @@ export interface EmailRecord {
   id: string;
   contactId: string;
   campaignId: string;
+  sequenceEnrollmentId: string;
+  stepIndex: string;
+  variant: string;
   subject: string;
   body: string;
   sentAt: string;
@@ -68,6 +72,100 @@ export interface EmailRecord {
   aiGenerated: "yes" | "no";
   prompt: string;
   threadId: string;
+  repliedAt: string;
+}
+
+export interface Task {
+  id: string;
+  contactId: string;
+  title: string;
+  dueAt: string;
+  status: "open" | "done";
+  owner: string;
+  notes: string;
+  createdAt: string;
+  completedAt: string;
+}
+
+export interface Activity {
+  id: string;
+  contactId: string;
+  type:
+    | "email_sent"
+    | "email_replied"
+    | "stage_change"
+    | "note"
+    | "task_created"
+    | "task_completed"
+    | "sequence_enrolled"
+    | "sequence_stopped"
+    | "form_submission"
+    | "score_updated";
+  summary: string;
+  meta: string;
+  createdAt: string;
+  actor: string;
+}
+
+export interface Sequence {
+  id: string;
+  name: string;
+  goal: string;
+  tone: string;
+  status: "draft" | "active" | "paused";
+  createdAt: string;
+}
+
+export interface SequenceStep {
+  id: string;
+  sequenceId: string;
+  stepIndex: string;
+  delayDays: string;
+  subjectHint: string;
+  instructions: string;
+  createdAt: string;
+}
+
+export interface Enrollment {
+  id: string;
+  sequenceId: string;
+  contactId: string;
+  status: "active" | "completed" | "stopped";
+  currentStep: string;
+  nextRunAt: string;
+  lastRunAt: string;
+  createdAt: string;
+  stoppedReason: string;
+}
+
+export interface Company {
+  id: string;
+  name: string;
+  domain: string;
+  industry: string;
+  size: string;
+  website: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FormDef {
+  id: string;
+  slug: string;
+  name: string;
+  fields: string;
+  redirectUrl: string;
+  tags: string;
+  sequenceId: string;
+  createdAt: string;
+}
+
+export interface SavedView {
+  id: string;
+  name: string;
+  filter: string;
+  createdAt: string;
 }
 
 export interface Template {

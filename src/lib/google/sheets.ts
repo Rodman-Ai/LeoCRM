@@ -53,6 +53,23 @@ export async function appendRow(
   return obj;
 }
 
+export async function appendRows(
+  clients: GoogleClients,
+  spreadsheetId: string,
+  schema: SheetSchema,
+  objects: Record<string, unknown>[],
+) {
+  if (objects.length === 0) return [];
+  const values = objects.map((o) => objectToRow(schema.headers, o));
+  await clients.sheets.spreadsheets.values.append({
+    spreadsheetId,
+    range: `${schema.title}!A:A`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values },
+  });
+  return objects;
+}
+
 export async function updateRowById(
   clients: GoogleClients,
   spreadsheetId: string,
