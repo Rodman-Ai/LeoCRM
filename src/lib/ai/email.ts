@@ -15,11 +15,13 @@ export interface GenerateEmailInput {
   senderCompany?: string;
   context?: string;
   prevThread?: string;
+  subjectVariants?: number; // 1 (default) or 2 for A/B
 }
 
 export interface GeneratedEmail {
   subject: string;
   body: string;
+  subjectB?: string;
 }
 
 const SYSTEM_PROMPT = `You are an outbound sales SDR assistant. Write concise, personalized cold/lead-gen emails.
@@ -29,7 +31,8 @@ Rules:
 - A single, specific call to action at the end.
 - Reference the prospect's company or role when provided. Never fabricate facts.
 - No spammy hype, no all-caps, no exclamation marks unless strictly natural.
-- Output strict JSON: { "subject": string, "body": string } and nothing else.`;
+- Output strict JSON: { "subject": string, "body": string, "subjectB"?: string } and nothing else.
+- If asked for two subjects, return both in "subject" (variant A) and "subjectB" (variant B). They must be distinct angles.`;
 
 export async function generateEmail(
   input: GenerateEmailInput,
@@ -56,7 +59,9 @@ export async function generateEmail(
     input.context ? `Extra context: ${input.context}` : "",
     input.prevThread ? `Previous thread:\n${input.prevThread}` : "",
     "",
-    `Return strict JSON: { "subject": "...", "body": "..." }`,
+    input.subjectVariants && input.subjectVariants >= 2
+      ? `Return strict JSON: { "subject": "<variant A>", "subjectB": "<variant B, different angle>", "body": "..." }`
+      : `Return strict JSON: { "subject": "...", "body": "..." }`,
   ].filter(Boolean);
 
   const response = await client.messages.create({
@@ -79,7 +84,11 @@ export async function generateEmail(
   if (!parsed.subject || !parsed.body) {
     throw new Error("AI returned an incomplete email");
   }
-  return { subject: parsed.subject, body: parsed.body };
+  return {
+    subject: parsed.subject,
+    body: parsed.body,
+    subjectB: parsed.subjectB,
+  };
 }
 
 function extractJson(text: string): string | null {

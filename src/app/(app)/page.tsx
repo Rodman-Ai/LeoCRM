@@ -50,9 +50,12 @@ export default function DashboardPage() {
         title="Dashboard"
         description="A snapshot of your pipeline and AI activity."
         actions={
-          <Link href="/compose" className="btn-primary">
-            New AI email
-          </Link>
+          <>
+            <SyncRepliesButton />
+            <Link href="/compose" className="btn-primary">
+              New AI email
+            </Link>
+          </>
         }
       />
       {error ? (
@@ -191,6 +194,35 @@ export default function DashboardPage() {
         ) : null}
       </div>
     </div>
+  );
+}
+
+function SyncRepliesButton() {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  return (
+    <button
+      className="btn-secondary"
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        setMsg(null);
+        try {
+          const res = await api.post<{ scanned: number; replies: number }>(
+            "/api/email/sync",
+            {},
+          );
+          setMsg(`${res.replies} new ${res.replies === 1 ? "reply" : "replies"}`);
+          if (res.replies > 0) setTimeout(() => location.reload(), 600);
+        } catch (e) {
+          setMsg((e as Error).message);
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? "Syncing…" : msg ?? "Sync replies"}
+    </button>
   );
 }
 

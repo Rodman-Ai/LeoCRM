@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     tone?: string;
     context?: string;
     senderCompany?: string;
+    abTest?: boolean;
   };
   if (!body.contact?.email || !body.goal) {
     return bad("contact.email and goal are required");
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
       context: body.context,
       senderName: r.ctx.name,
       senderCompany: body.senderCompany,
+      subjectVariants: body.abTest ? 2 : 1,
     });
     return ok(email);
   } catch (err) {

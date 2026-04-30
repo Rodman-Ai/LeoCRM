@@ -1,0 +1,45 @@
+# Publishes a static landing page to GitHub Pages.
+#
+# IMPORTANT: GitHub Pages serves static files only. The full LeoCRM app needs
+# a server for NextAuth, Google API calls, and Anthropic AI generation, so
+# only this small landing page lives at the Pages URL. The actual app must
+# run on Vercel/Cloudflare Pages/Netlify (see .github/workflows/deploy.yml).
+name: GitHub Pages (landing)
+
+on:
+  push:
+    branches: [main, claude/ai-email-crm-google-vwLTr]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Stage landing page
+        run: |
+          mkdir -p _site
+          cp public/landing/index.html _site/index.html
+          cp public/icon.svg _site/icon.svg
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

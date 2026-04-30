@@ -13,6 +13,26 @@ function encodeHeader(value: string) {
   return `=?UTF-8?B?${Buffer.from(value, "utf-8").toString("base64")}?=`;
 }
 
+export async function getThreadMessageCount(
+  clients: GoogleClients,
+  threadId: string,
+): Promise<{ count: number; latestFrom: string; latestDate: string }> {
+  const res = await clients.gmail.users.threads.get({
+    userId: "me",
+    id: threadId,
+    format: "metadata",
+    metadataHeaders: ["From", "Date"],
+  });
+  const messages = res.data.messages ?? [];
+  const last = messages[messages.length - 1];
+  const headers = last?.payload?.headers ?? [];
+  const from =
+    headers.find((h) => h.name?.toLowerCase() === "from")?.value ?? "";
+  const date =
+    headers.find((h) => h.name?.toLowerCase() === "date")?.value ?? "";
+  return { count: messages.length, latestFrom: from, latestDate: date };
+}
+
 export async function sendEmail(
   clients: GoogleClients,
   input: SendEmailInput,

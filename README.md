@@ -115,6 +115,20 @@ instructions in the job summary — CI still runs (typecheck + build).
 in the Vercel/Netlify UI; both detect Next.js and "just work" with the env
 vars from step 3.
 
+**C) Cloudflare Pages** — supports Next.js with Functions out of the box.
+Connect the repo in the Cloudflare dashboard, set the same env vars, and
+push.
+
+### Why not GitHub Pages?
+
+GitHub Pages serves static files only. LeoCRM needs a server to (a) handle
+NextAuth's OAuth callback and refresh tokens, (b) call Google Sheets/Drive/
+Gmail with the user's access token, and (c) call Claude with the
+server-side `ANTHROPIC_API_KEY` (which must never ship to the browser). The
+bundled `.github/workflows/pages.yml` publishes a marketing/landing page to
+GitHub Pages that links to your real, server-hosted app — useful as a free
+public URL that says what LeoCRM is.
+
 ## Mobile
 
 The app is a responsive PWA — visit on iOS Safari or Android Chrome and use

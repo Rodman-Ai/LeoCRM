@@ -27,6 +27,9 @@ function ComposeInner() {
   const [tone, setTone] = useState("warm, direct, professional");
   const [context, setContext] = useState("");
   const [subject, setSubject] = useState("");
+  const [subjectB, setSubjectB] = useState("");
+  const [chosenVariant, setChosenVariant] = useState<"A" | "B">("A");
+  const [abTest, setAbTest] = useState(false);
   const [body, setBody] = useState("");
   const [generating, setGenerating] = useState(false);
   const [sending, setSending] = useState(false);
@@ -57,24 +60,28 @@ function ComposeInner() {
     setInfo(null);
     setGenerating(true);
     try {
-      const res = await api.post<{ subject: string; body: string }>(
-        "/api/ai/generate",
-        {
-          contact: {
-            name: contact.name,
-            email: contact.email,
-            company: contact.company,
-            role: contact.role,
-            tags: contact.tags,
-            notes: contact.notes,
-          },
-          goal,
-          tone,
-          context,
+      const res = await api.post<{
+        subject: string;
+        body: string;
+        subjectB?: string;
+      }>("/api/ai/generate", {
+        contact: {
+          name: contact.name,
+          email: contact.email,
+          company: contact.company,
+          role: contact.role,
+          tags: contact.tags,
+          notes: contact.notes,
         },
-      );
+        goal,
+        tone,
+        context,
+        abTest,
+      });
       setSubject(res.subject);
+      setSubjectB(res.subjectB ?? "");
       setBody(res.body);
+      setChosenVariant("A");
       setAiUsed(true);
     } catch (err) {
       setError((err as Error).message);
@@ -96,14 +103,17 @@ function ComposeInner() {
     setSending(true);
     setError(null);
     setInfo(null);
+    const useB = abTest && subjectB && chosenVariant === "B";
+    const finalSubject = useB ? subjectB : subject;
     try {
       await api.post("/api/email/send", {
         contactId: contact.id,
         to: contact.email,
-        subject,
+        subject: finalSubject,
         body,
         aiGenerated: aiUsed,
         prompt: aiUsed ? `${goal} (tone: ${tone})` : "",
+        variant: abTest ? chosenVariant : "",
       });
       setInfo(`Sent to ${contact.email}.`);
       setTimeout(() => router.push(`/contacts/${contact.id}`), 600);
@@ -180,6 +190,14 @@ function ComposeInner() {
               onChange={(e) => setContext(e.target.value)}
             />
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={abTest}
+              onChange={(e) => setAbTest(e.target.checked)}
+            />
+            A/B test subject lines (Claude returns two; pick before sending)
+          </label>
           <button
             className="btn-primary w-full"
             onClick={generate}
@@ -196,13 +214,51 @@ function ComposeInner() {
 
         <div className="card space-y-3">
           <label className="block">
-            <span className="label">Subject</span>
+            <span className="label">
+              Subject {abTest && subjectB ? "(variant A)" : ""}
+            </span>
             <input
               className="input"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
             />
           </label>
+          {abTest && subjectB ? (
+            <>
+              <label className="block">
+                <span className="label">Subject (variant B)</span>
+                <input
+                  className="input"
+                  value={subjectB}
+                  onChange={(e) => setSubjectB(e.target.value)}
+                />
+              </label>
+              <div className="flex gap-2 text-sm">
+                <button
+                  type="button"
+                  onClick={() => setChosenVariant("A")}
+                  className={`flex-1 rounded-lg border px-3 py-2 ${
+                    chosenVariant === "A"
+                      ? "border-leo-500 bg-leo-50 text-leo-700"
+                      : "border-slate-300"
+                  }`}
+                >
+                  Send variant A
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChosenVariant("B")}
+                  className={`flex-1 rounded-lg border px-3 py-2 ${
+                    chosenVariant === "B"
+                      ? "border-leo-500 bg-leo-50 text-leo-700"
+                      : "border-slate-300"
+                  }`}
+                >
+                  Send variant B
+                </button>
+              </div>
+            </>
+          ) : null}
           <label className="block">
             <span className="label">Body</span>
             <textarea
