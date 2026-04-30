@@ -1,9 +1,12 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { DEMO_MODE } from "@/lib/client";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   return (
     <main className="flex min-h-screen items-center justify-center bg-gradient-to-br from-leo-50 via-white to-leo-100 p-6 dark:from-slate-950 dark:via-slate-900 dark:to-leo-900/40">
@@ -20,14 +23,26 @@ export default function LoginPage() {
           disabled={loading}
           onClick={() => {
             setLoading(true);
+            if (DEMO_MODE) {
+              if (typeof window !== "undefined") {
+                window.localStorage.setItem("leocrm.demo.session", "1");
+              }
+              router.push("/");
+              return;
+            }
             signIn("google", { callbackUrl: "/" });
           }}
         >
-          {loading ? "Connecting…" : "Continue with Google Workspace"}
+          {loading
+            ? "Loading…"
+            : DEMO_MODE
+              ? "Try the demo →"
+              : "Continue with Google Workspace"}
         </button>
         <p className="mt-4 text-xs text-slate-400">
-          We request access to Sheets, Drive, and Gmail-send to manage your CRM
-          data and send AI emails on your behalf.
+          {DEMO_MODE
+            ? "Demo mode: data is stored locally in your browser. No Google login, no emails sent. Refresh and choose Reset demo from settings to start over."
+            : "We request access to Sheets, Drive, and Gmail-send to manage your CRM data and send AI emails on your behalf."}
         </p>
       </div>
     </main>

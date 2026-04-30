@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
 import { ReactNode } from "react";
+import { DEMO_MODE } from "@/lib/client";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
@@ -30,8 +31,22 @@ const MOBILE_NAV = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const path = usePathname();
+  const router = useRouter();
   const { data } = useSession();
-  const userName = data?.user?.name ?? data?.user?.email ?? "";
+  const userName = DEMO_MODE
+    ? "Demo user"
+    : (data?.user?.name ?? data?.user?.email ?? "");
+
+  function handleSignOut() {
+    if (DEMO_MODE) {
+      if (typeof window !== "undefined") {
+        window.localStorage.removeItem("leocrm.demo.session");
+      }
+      router.push("/login");
+      return;
+    }
+    signOut({ callbackUrl: "/login" });
+  }
 
   return (
     <div className="flex min-h-screen w-full">
@@ -63,7 +78,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="border-t border-slate-200 p-3 text-xs dark:border-slate-800">
           <div className="truncate font-medium">{userName}</div>
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={handleSignOut}
             className="mt-1 text-slate-500 hover:text-leo-600"
           >
             Sign out
@@ -79,7 +94,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="font-semibold">LeoCRM</span>
           </div>
           <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
+            onClick={handleSignOut}
             className="text-xs text-slate-500"
           >
             Sign out

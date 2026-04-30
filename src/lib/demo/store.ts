@@ -19,7 +19,8 @@ import {
 const PREFIX = "leocrm.demo.";
 const SEED_FLAG = `${PREFIX}seeded.v1`;
 
-type AnyRow = Record<string, unknown> & { id: string };
+// Intentionally permissive — every demo table has an `id` column at runtime.
+type AnyRow = unknown;
 
 export const TABLES = {
   contacts: SEED_CONTACTS,
@@ -56,7 +57,7 @@ function ensureSeeded() {
   window.localStorage.setItem(SEED_FLAG, "1");
 }
 
-export function readTable<T extends AnyRow>(name: TableName): T[] {
+export function readTable<T = AnyRow>(name: TableName): T[] {
   if (!lsAvailable()) {
     return [...(TABLES[name] as unknown as T[])];
   }
@@ -70,7 +71,7 @@ export function readTable<T extends AnyRow>(name: TableName): T[] {
   }
 }
 
-export function writeTable<T extends AnyRow>(name: TableName, rows: T[]) {
+export function writeTable<T = AnyRow>(name: TableName, rows: T[]) {
   if (!lsAvailable()) return;
   window.localStorage.setItem(PREFIX + name, JSON.stringify(rows));
 }

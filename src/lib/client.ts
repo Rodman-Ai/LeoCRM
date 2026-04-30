@@ -1,8 +1,18 @@
+import { demoFetch } from "./demo/router";
+
+export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
 async function jsonFetch<T>(
   url: string,
   init?: Omit<RequestInit, "body"> & { body?: unknown },
 ): Promise<T> {
   const { body, headers, ...rest } = init ?? {};
+  if (DEMO_MODE) {
+    return demoFetch<T>(url, {
+      method: rest.method,
+      body: body !== undefined ? JSON.stringify(body) : null,
+    });
+  }
   const res = await fetch(url, {
     ...rest,
     headers: { "Content-Type": "application/json", ...(headers || {}) },
