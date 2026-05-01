@@ -12,6 +12,7 @@ import { GlobalShortcuts } from "./GlobalShortcuts";
 import { RecentlyViewed } from "./RecentlyViewed";
 import { OnboardingTour } from "./OnboardingTour";
 import { MentionsBell } from "./MentionsBell";
+import { PWAInstallPrompt } from "./PWAInstallPrompt";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
@@ -30,6 +31,7 @@ const NAV = [
   { href: "/forms", label: "Forms" },
   { href: "/members", label: "Team" },
   { href: "/audit", label: "Audit" },
+  { href: "/assistant", label: "AI Assistant" },
   { href: "/settings", label: "Settings" },
 ];
 
@@ -66,6 +68,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <CommandPalette />
       <GlobalShortcuts />
       <OnboardingTour />
+      <PWAInstallPrompt />
       <div className="flex min-h-0 flex-1">
       <aside className="hidden w-60 shrink-0 border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 md:flex md:flex-col">
         <div className="flex h-14 items-center gap-2 px-4">

@@ -296,6 +296,56 @@ export default function ContactDetailPage() {
             >
               Print
             </button>
+            <button
+              onClick={() => {
+                if (!contact) return;
+                const bundle = {
+                  contact,
+                  lead,
+                  emails,
+                  tasks,
+                  activity,
+                  exportedAt: new Date().toISOString(),
+                };
+                const blob = new Blob([JSON.stringify(bundle, null, 2)], {
+                  type: "application/json",
+                });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `leocrm-${contact.id}.json`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 0);
+                ui.toast("Exported as JSON", { kind: "success" });
+              }}
+              className="btn-secondary"
+              title="GDPR export — full bundle of all data for this contact"
+            >
+              Export
+            </button>
+            <button
+              onClick={async () => {
+                if (!contact) return;
+                const okGo = await ui.confirm(
+                  "Forget this contact? Deletes contact, lead, linked tasks. Emails and activity history remain anonymized.",
+                  { confirmLabel: "Forget", danger: true },
+                );
+                if (!okGo) return;
+                if (lead) await api.del(`/api/leads/${lead.id}`);
+                for (const t of tasks) {
+                  await api.del(`/api/tasks/${t.id}`);
+                }
+                await api.del(`/api/contacts/${contact.id}`);
+                ui.toast("Forgotten.", { kind: "success" });
+                router.push("/contacts");
+              }}
+              className="btn-secondary text-rose-600"
+              title="GDPR right-to-forget"
+            >
+              Forget
+            </button>
             <button onClick={remove} className="btn-secondary">
               Delete
             </button>
@@ -315,7 +365,19 @@ export default function ContactDetailPage() {
                 await load();
               }}
             />
-            <Row k="Email" v={contact.email} />
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-slate-400">
+                Email
+              </dt>
+              <dd className="text-sm">
+                <a
+                  href={`mailto:${contact.email}`}
+                  className="text-leo-600 hover:underline"
+                >
+                  {contact.email}
+                </a>
+              </dd>
+            </div>
             <EditableRow
               k="Role"
               v={contact.role}
@@ -335,6 +397,18 @@ export default function ContactDetailPage() {
             <EditableRow
               k="Phone"
               v={contact.phone}
+              renderValue={(v) =>
+                v ? (
+                  <a
+                    href={`tel:${v.replace(/\s/g, "")}`}
+                    className="text-leo-600 hover:underline"
+                  >
+                    {v}
+                  </a>
+                ) : (
+                  "—"
+                )
+              }
               onSave={async (v) => {
                 await api.patch(`/api/contacts/${contact.id}`, { phone: v });
                 await load();
@@ -343,6 +417,20 @@ export default function ContactDetailPage() {
             <EditableRow
               k="LinkedIn"
               v={contact.linkedin}
+              renderValue={(v) =>
+                v ? (
+                  <a
+                    href={v.startsWith("http") ? v : `https://${v}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-leo-600 hover:underline"
+                  >
+                    {v}
+                  </a>
+                ) : (
+                  "—"
+                )
+              }
               onSave={async (v) => {
                 await api.patch(`/api/contacts/${contact.id}`, { linkedin: v });
                 await load();

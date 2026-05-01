@@ -167,6 +167,40 @@ async function dispatch(ctx: RouteCtx): Promise<unknown> {
   if (pathname === "/api/meetings") return crud("meetings", "mt", ctx);
   if (pathname === "/api/tags") return crud("tags", "tg", ctx);
 
+  // AI research / talking points / ask
+  if (pathname === "/api/ai/research") {
+    const company = String(body?.company ?? "the company");
+    return {
+      brief: `# ${company}\n\n**One-liner**: ${company} is operating in their market with steady growth.\n\n**Why now**:\n- Hiring signals suggest revenue-team scaling\n- Recent press / launch hints at a fresh outbound need\n- ICP fit on team size and tooling stack\n\n**Key personas**:\n- VP Sales / Head of Sales Ops\n- RevOps Manager (likely champion)\n\n**Conversation starters**:\n- Reference the recent expansion or hiring\n- Lead with a peer customer outcome\n- Offer a concise compare doc, not a demo\n\n(Generated locally in demo mode.)`,
+    };
+  }
+  if (pathname === "/api/ai/talking-points") {
+    return {
+      points: [
+        "Open with a quick recap of the last touchpoint.",
+        "Lead with a peer customer outcome (~30s).",
+        "Ask: what does success look like 6 months from now?",
+        "Probe budget timing without naming a number first.",
+        "Land on one concrete next step (demo, trial, or intro).",
+      ],
+    };
+  }
+  if (pathname === "/api/ai/ask") {
+    const q = String(body?.question ?? "").toLowerCase();
+    let answer = `I parsed: "${body?.question}". In demo mode I return a templated response.`;
+    if (/stalled|stale|stuck/.test(q))
+      answer = `Stalled deals are on Reports → "Stale-deal SLA alerts" (non-terminal stage 14+ days).`;
+    else if (/who|prioritize|next/.test(q))
+      answer = `Dashboard "Suggested next contact" already ranks your top untouched lead.`;
+    else if (/reply rate|conversion/.test(q))
+      answer = `Reports → AI vs non-AI panel and the top-row stats break this down.`;
+    else if (/forecast|pipeline/.test(q))
+      answer = `Reports → "Forecast by month" + Deals page totals show open + weighted pipeline.`;
+    else if (/goal|target/.test(q))
+      answer = `Dashboard → "Weekly send goal" tracks progress vs 25 sends/wk.`;
+    return { answer };
+  }
+
   // AI subject test (5 variants)
   if (pathname === "/api/ai/subject-test") {
     const c = (body?.contact ?? {}) as { name?: string; company?: string };
