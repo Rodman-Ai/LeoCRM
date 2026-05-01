@@ -8,6 +8,7 @@ import type {
   Company,
   Contact,
   Deal,
+  EmailEvent,
   EmailRecord,
   Enrollment,
   FormDef,
@@ -15,8 +16,11 @@ import type {
   Member,
   Pipeline,
   SavedView,
+  ScheduledEmail,
   Sequence,
   SequenceStep,
+  Snippet,
+  SuppressionEntry,
   Task,
   Template,
 } from "../types";
@@ -997,6 +1001,38 @@ export const SEED_FORMS: FormDef[] = [
   },
   { id: "f_demo_003", slug: "investor-intro", name: "Investor intro request", fields: '["name","email","company","role","notes"]', redirectUrl: "", tags: "investor", sequenceId: "", createdAt: D(-5) },
   { id: "f_demo_004", slug: "partner-program", name: "Partner program signup", fields: '["name","email","company","notes"]', redirectUrl: "", tags: "partner", sequenceId: "seq_demo_002", createdAt: D(-3) },
+];
+
+export const SEED_EMAIL_EVENTS: EmailEvent[] = [
+  { id: "ee_demo_001", emailId: "e_demo_001", type: "open", url: "", ip: "—", userAgent: "Apple Mail", createdAt: D(-7) },
+  { id: "ee_demo_002", emailId: "e_demo_001", type: "click", url: "https://yourco.example/demo", ip: "—", userAgent: "Apple Mail", createdAt: D(-7) },
+  { id: "ee_demo_003", emailId: "e_demo_003", type: "open", url: "", ip: "—", userAgent: "Gmail Mobile", createdAt: D(-3) },
+  { id: "ee_demo_004", emailId: "e_demo_003", type: "open", url: "", ip: "—", userAgent: "Gmail Web", createdAt: D(-2) },
+  { id: "ee_demo_005", emailId: "e_demo_006", type: "open", url: "", ip: "—", userAgent: "Outlook", createdAt: D(-12) },
+  { id: "ee_demo_006", emailId: "e_demo_010", type: "open", url: "", ip: "—", userAgent: "Apple Mail", createdAt: D(-3) },
+  { id: "ee_demo_007", emailId: "e_demo_010", type: "click", url: "https://yourco.example/case-study", ip: "—", userAgent: "Apple Mail", createdAt: D(-3) },
+  { id: "ee_demo_008", emailId: "e_demo_014", type: "open", url: "", ip: "—", userAgent: "Gmail Web", createdAt: D(-9) },
+  { id: "ee_demo_009", emailId: "e_demo_022", type: "open", url: "", ip: "—", userAgent: "Apple Mail", createdAt: D(-2) },
+  { id: "ee_demo_010", emailId: "e_demo_022", type: "click", url: "https://yourco.example/pricing", ip: "—", userAgent: "Apple Mail", createdAt: D(-2) },
+  { id: "ee_demo_011", emailId: "e_demo_004", type: "open", url: "", ip: "—", userAgent: "Gmail Web", createdAt: D(-1) },
+];
+
+export const SEED_SCHEDULED: ScheduledEmail[] = [
+  { id: "se_demo_001", contactId: "c_demo_017", to: "sofia@palette-co.example", subject: "Quick idea for Palette", body: "Hi Sofia,\n\nFollow-up on Q3 nurture flow.\n\n— You", scheduledFor: D(2), status: "scheduled", createdAt: D(-1), sentAt: "" },
+  { id: "se_demo_002", contactId: "c_demo_023", to: "henrik@arcfield.example", subject: "Arcfield — opener", body: "Hi Henrik,\n\nWe help VPs Sales like you ship 30% more pipeline.\n\n— You", scheduledFor: D(1), status: "scheduled", createdAt: D(-1), sentAt: "" },
+];
+
+export const SEED_SUPPRESSION: SuppressionEntry[] = [
+  { id: "sp_demo_001", email: "bounced@example.invalid", reason: "bounce", source: "auto", createdAt: D(-15) },
+  { id: "sp_demo_002", email: "optout@brand.example", reason: "unsubscribe", source: "auto", createdAt: D(-10) },
+  { id: "sp_demo_003", email: "donotcontact@silentco.example", reason: "manual", source: "you@yourco.example", createdAt: D(-5) },
+];
+
+export const SEED_SNIPPETS: Snippet[] = [
+  { id: "sn_demo_001", trigger: "/sig", name: "Default signature", body: "— You\nyourco.com\nhttps://cal.com/you/15min", createdAt: D(-30) },
+  { id: "sn_demo_002", trigger: "/intro", name: "Intro line", body: "I'll keep this short — we help VPs of Sales ship 30% more pipeline with AI-personalized outreach.", createdAt: D(-21) },
+  { id: "sn_demo_003", trigger: "/cal", name: "Calendar link", body: "Grab a 15-min slot here: https://cal.com/you/15min", createdAt: D(-14) },
+  { id: "sn_demo_004", trigger: "/case", name: "Case study", body: "Recent customer (similar size to yours) cut SDR ramp time in half. Happy to share a redacted case study.", createdAt: D(-7) },
 ];
 
 export const SEED_PIPELINES: Pipeline[] = [

@@ -4,7 +4,8 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
-import type { Contact, Template } from "@/lib/types";
+import type { Contact, ScheduledEmail, Snippet, Template } from "@/lib/types";
+import { useUI } from "@/components/ui/UIProvider";
 
 export default function ComposePage() {
   return (
@@ -76,6 +77,20 @@ function rewriteBody(text: string, mode: string): string {
   if (mode === "Add P.S.") {
     return text + `\n\nP.S. Happy to send a one-pager if useful.`;
   }
+  if (mode === "Polish") {
+    // Naive polish: remove double spaces, fix common typos, capitalize "i".
+    return text
+      .replace(/\s{2,}/g, " ")
+      .replace(/\b(teh|recieve|seperate)\b/gi, (m) => {
+        const map: Record<string, string> = {
+          teh: "the",
+          recieve: "receive",
+          seperate: "separate",
+        };
+        return map[m.toLowerCase()] ?? m;
+      })
+      .replace(/(^|\n)i\b/g, "$1I");
+  }
   return text;
 }
 
@@ -104,7 +119,12 @@ function ComposeInner() {
   const search = useSearchParams();
   const router = useRouter();
   const initialId = search.get("contactId") ?? "";
+  const ui = useUI();
   const [signature, setSignature] = useState("");
+  const [snippets, setSnippets] = useState<Snippet[]>([]);
+  const [scheduleAt, setScheduleAt] = useState("");
+  const [variants5, setVariants5] = useState<string[] | null>(null);
+  const [optimizing, setOptimizing] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [contactId, setContactId] = useState(initialId);
@@ -133,6 +153,12 @@ function ComposeInner() {
       setContacts(c);
       setTemplates(t);
       if (!initialId && c.length > 0) setContactId(c[0].id);
+      try {
+        const s = await api.get<Snippet[]>("/api/snippets");
+        setSnippets(s);
+      } catch {
+        // ignore
+      }
     })();
     if (typeof window !== "undefined") {
       setSignature(window.localStorage.getItem(SIG_KEY) ?? "");
@@ -328,6 +354,51 @@ function ComposeInner() {
           >
             {generating ? "Generating…" : "Generate with AI"}
           </button>
+          <button
+            type="button"
+            className="btn-secondary w-full text-xs"
+            disabled={optimizing || !contact}
+            onClick={async () => {
+              if (!contact) return;
+              setOptimizing(true);
+              try {
+                const res = await api.post<{ variants: string[] }>(
+                  "/api/ai/subject-test",
+                  {
+                    contact: { name: contact.name, company: contact.company },
+                    goal,
+                  },
+                );
+                setVariants5(res.variants);
+              } finally {
+                setOptimizing(false);
+              }
+            }}
+          >
+            {optimizing ? "Generating subjects…" : "AI: 5 subject variants"}
+          </button>
+          {variants5 ? (
+            <div className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+              <div className="mb-2 text-xs font-medium text-slate-500">
+                Pick a subject:
+              </div>
+              <ul className="space-y-1">
+                {variants5.map((v, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setSubject(v);
+                        setVariants5(null);
+                      }}
+                      className="flex-1 rounded px-2 py-1 text-left text-sm hover:bg-leo-50 dark:hover:bg-leo-900/30"
+                    >
+                      {v}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {error ? (
             <p className="text-sm text-red-600">{error}</p>
           ) : info ? (
@@ -431,13 +502,12 @@ function ComposeInner() {
           {body ? (
             <div className="flex flex-wrap items-center gap-1 text-xs">
               <span className="text-slate-500">AI rewrite:</span>
-              {(["Tighter", "Formal", "Casual", "Add P.S."] as const).map(
+              {(["Tighter", "Formal", "Casual", "Polish", "Add P.S."] as const).map(
                 (variant) => (
                   <button
                     key={variant}
                     type="button"
                     onClick={() => {
-                      // Local stub transform for demo. Hooks into AI in non-demo.
                       const transformed = rewriteBody(body, variant);
                       setBody(transformed);
                     }}
@@ -449,6 +519,54 @@ function ComposeInner() {
               )}
             </div>
           ) : null}
+          {snippets.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1 text-xs">
+              <span className="text-slate-500">Insert snippet:</span>
+              {snippets.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setBody((b) => `${b}${b ? "\n\n" : ""}${s.body}`)}
+                  className="rounded-full bg-slate-100 px-2 py-1 hover:bg-leo-100 hover:text-leo-700 dark:bg-slate-800"
+                  title={s.body}
+                >
+                  {s.trigger}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+            <label>Send later:</label>
+            <input
+              type="datetime-local"
+              value={scheduleAt}
+              onChange={(e) => setScheduleAt(e.target.value)}
+              className="input w-auto py-1 text-xs"
+            />
+            {scheduleAt ? (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!contact || !subject || !body) return;
+                  await api.post("/api/scheduled", {
+                    contactId: contact.id,
+                    to: contact.email,
+                    subject,
+                    body,
+                    scheduledFor: new Date(scheduleAt).toISOString(),
+                  });
+                  ui.toast(
+                    `Scheduled for ${new Date(scheduleAt).toLocaleString()}`,
+                    { kind: "success" },
+                  );
+                  setScheduleAt("");
+                }}
+                className="text-leo-600 hover:underline"
+              >
+                Schedule send
+              </button>
+            ) : null}
+          </div>
           {signature ? (
             <p className="text-[11px] text-slate-400">
               Signature appended at send time.

@@ -118,6 +118,48 @@ async function dispatch(ctx: RouteCtx): Promise<unknown> {
   const dm = pathname.match(/^\/api\/deals\/([^/]+)$/);
   if (dm) return crudOne("deals", dm[1], ctx);
 
+  // email events (open / click)
+  if (pathname === "/api/email-events") return crud("emailEvents", "ee", ctx);
+
+  // scheduled emails
+  if (pathname === "/api/scheduled") return crud("scheduled", "se", ctx);
+  const sm = pathname.match(/^\/api\/scheduled\/([^/]+)$/);
+  if (sm) return crudOne("scheduled", sm[1], ctx);
+
+  // suppression list
+  if (pathname === "/api/suppression") {
+    if (method === "GET") return readTable("suppression");
+    if (method === "POST") return crud("suppression", "sp", ctx);
+    if (method === "DELETE") {
+      const id = search.get("id") ?? "";
+      const rows = readTable<Record<string, string>>("suppression");
+      writeTable(
+        "suppression",
+        rows.filter((r) => r.id !== id),
+      );
+      return { deleted: true };
+    }
+  }
+
+  // snippets
+  if (pathname === "/api/snippets") return crud("snippets", "sn", ctx);
+
+  // AI subject test (5 variants)
+  if (pathname === "/api/ai/subject-test") {
+    const c = (body?.contact ?? {}) as { name?: string; company?: string };
+    const company = c.company || "your team";
+    const first = (c.name || "there").split(" ")[0];
+    return {
+      variants: [
+        `Quick idea for ${company}`,
+        `${first}, 15 minutes on ${company}'s outbound?`,
+        `${company} + 30% more pipeline?`,
+        `One question about ${company}`,
+        `${first} — worth a look?`,
+      ],
+    };
+  }
+
   // members
   if (pathname === "/api/members") return crud("members", "m", ctx);
   const mm = pathname.match(/^\/api\/members\/([^/]+)$/);

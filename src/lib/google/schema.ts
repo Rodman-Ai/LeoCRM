@@ -174,6 +174,32 @@ export const SHEETS: Record<string, SheetSchema> = {
     title: "Pipelines",
     headers: ["id", "name", "stages", "isDefault", "createdAt"],
   },
+  EmailEvents: {
+    title: "EmailEvents",
+    headers: ["id", "emailId", "type", "url", "ip", "userAgent", "createdAt"],
+  },
+  ScheduledEmails: {
+    title: "ScheduledEmails",
+    headers: [
+      "id",
+      "contactId",
+      "to",
+      "subject",
+      "body",
+      "scheduledFor",
+      "status",
+      "createdAt",
+      "sentAt",
+    ],
+  },
+  Suppression: {
+    title: "Suppression",
+    headers: ["id", "email", "reason", "source", "createdAt"],
+  },
+  Snippets: {
+    title: "Snippets",
+    headers: ["id", "trigger", "name", "body", "createdAt"],
+  },
   Deals: {
     title: "Deals",
     headers: [

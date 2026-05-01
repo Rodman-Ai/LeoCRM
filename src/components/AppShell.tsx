@@ -22,6 +22,7 @@ const NAV = [
   { href: "/sequences", label: "Sequences" },
   { href: "/campaigns", label: "Campaigns" },
   { href: "/compose", label: "AI Compose" },
+  { href: "/inbox", label: "Inbox" },
   { href: "/tasks", label: "Tasks" },
   { href: "/reports", label: "Reports" },
   { href: "/templates", label: "Templates" },

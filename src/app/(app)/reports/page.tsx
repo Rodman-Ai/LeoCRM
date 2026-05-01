@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
-import type { Campaign, Deal, EmailRecord, Lead } from "@/lib/types";
+import type {
+  Campaign,
+  Deal,
+  EmailEvent,
+  EmailRecord,
+  Lead,
+} from "@/lib/types";
 import { LEAD_STAGES } from "@/lib/types";
 
 export default function ReportsPage() {
@@ -11,19 +17,24 @@ export default function ReportsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [events, setEvents] = useState<EmailEvent[]>([]);
 
   useEffect(() => {
     (async () => {
-      const [e, l, c, d] = await Promise.all([
+      const [e, l, c, d, ev] = await Promise.all([
         api.get<EmailRecord[]>("/api/emails"),
         api.get<Lead[]>("/api/leads"),
         api.get<Campaign[]>("/api/campaigns"),
         api.get<Deal[]>("/api/deals").catch(() => [] as Deal[]),
+        api.get<EmailEvent[]>("/api/email-events").catch(
+          () => [] as EmailEvent[],
+        ),
       ]);
       setEmails(e);
       setLeads(l);
       setCampaigns(c);
       setDeals(d);
+      setEvents(ev);
     })();
   }, []);
 
@@ -71,6 +82,57 @@ export default function ReportsPage() {
         title="Reports"
         description="Conversion funnel, AI vs non-AI reply rates, and send timing."
       />
+
+      {(() => {
+        const opens = events.filter((e) => e.type === "open");
+        const clicks = events.filter((e) => e.type === "click");
+        const sentIds = new Set(sent.map((s) => s.id));
+        const openedEmails = new Set(
+          opens.filter((e) => sentIds.has(e.emailId)).map((e) => e.emailId),
+        );
+        const clickedEmails = new Set(
+          clicks.filter((e) => sentIds.has(e.emailId)).map((e) => e.emailId),
+        );
+        const openRate = sent.length
+          ? Math.round((openedEmails.size / sent.length) * 100)
+          : 0;
+        const ctr = openedEmails.size
+          ? Math.round((clickedEmails.size / openedEmails.size) * 100)
+          : 0;
+        return (
+          <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-3">
+            <div className="card">
+              <div className="text-xs uppercase tracking-wide text-slate-500">
+                Open rate
+              </div>
+              <div className="mt-1 text-2xl font-semibold">{openRate}%</div>
+              <div className="text-xs text-slate-400">
+                {openedEmails.size} / {sent.length} unique opens
+              </div>
+            </div>
+            <div className="card">
+              <div className="text-xs uppercase tracking-wide text-slate-500">
+                Click-through (of opens)
+              </div>
+              <div className="mt-1 text-2xl font-semibold">{ctr}%</div>
+              <div className="text-xs text-slate-400">
+                {clickedEmails.size} clicks
+              </div>
+            </div>
+            <div className="card">
+              <div className="text-xs uppercase tracking-wide text-slate-500">
+                Total events
+              </div>
+              <div className="mt-1 text-2xl font-semibold">
+                {events.length}
+              </div>
+              <div className="text-xs text-slate-400">
+                {opens.length} opens · {clicks.length} clicks
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <Stat label="Sent" value={sent.length} />

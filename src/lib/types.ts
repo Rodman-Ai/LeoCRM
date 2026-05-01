@@ -232,6 +232,44 @@ export interface Deal {
   closedAt: string;
 }
 
+export interface EmailEvent {
+  id: string;
+  emailId: string;
+  type: "open" | "click";
+  url: string;
+  ip: string;
+  userAgent: string;
+  createdAt: string;
+}
+
+export interface ScheduledEmail {
+  id: string;
+  contactId: string;
+  to: string;
+  subject: string;
+  body: string;
+  scheduledFor: string;
+  status: "scheduled" | "sent" | "cancelled";
+  createdAt: string;
+  sentAt: string;
+}
+
+export interface SuppressionEntry {
+  id: string;
+  email: string;
+  reason: "bounce" | "unsubscribe" | "manual";
+  source: string;
+  createdAt: string;
+}
+
+export interface Snippet {
+  id: string;
+  trigger: string;
+  name: string;
+  body: string;
+  createdAt: string;
+}
+
 export type MemberRole = "admin" | "rep" | "viewer";
 
 export interface Member {
