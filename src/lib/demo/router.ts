@@ -108,6 +108,16 @@ async function dispatch(ctx: RouteCtx): Promise<unknown> {
   if (pathname === "/api/sequences/run") return sequencesRun();
   if (pathname === "/api/enrollments") return readTable("enrollments");
 
+  // pipelines
+  if (pathname === "/api/pipelines") return crud("pipelines", "pl", ctx);
+  const plm = pathname.match(/^\/api\/pipelines\/([^/]+)$/);
+  if (plm) return crudOne("pipelines", plm[1], ctx);
+
+  // deals
+  if (pathname === "/api/deals") return crud("deals", "d", ctx);
+  const dm = pathname.match(/^\/api\/deals\/([^/]+)$/);
+  if (dm) return crudOne("deals", dm[1], ctx);
+
   // members
   if (pathname === "/api/members") return crud("members", "m", ctx);
   const mm = pathname.match(/^\/api\/members\/([^/]+)$/);

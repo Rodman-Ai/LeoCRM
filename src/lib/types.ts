@@ -168,6 +168,70 @@ export interface SavedView {
   createdAt: string;
 }
 
+export interface Pipeline {
+  id: string;
+  name: string;
+  stages: string;
+  isDefault: "yes" | "no";
+  createdAt: string;
+}
+
+export type DealStage =
+  | "discovery"
+  | "evaluation"
+  | "proposal"
+  | "negotiation"
+  | "won"
+  | "lost";
+
+export const DEAL_STAGES: DealStage[] = [
+  "discovery",
+  "evaluation",
+  "proposal",
+  "negotiation",
+  "won",
+  "lost",
+];
+
+export const DEAL_STAGE_DEFAULT_PROB: Record<DealStage, number> = {
+  discovery: 0.1,
+  evaluation: 0.25,
+  proposal: 0.5,
+  negotiation: 0.75,
+  won: 1,
+  lost: 0,
+};
+
+export type ContractStatus =
+  | ""
+  | "drafting"
+  | "sent"
+  | "viewed"
+  | "signed"
+  | "declined";
+
+export interface Deal {
+  id: string;
+  name: string;
+  pipelineId: string;
+  stage: DealStage;
+  probability: string; // 0..1 stored as string
+  value: number;
+  expectedCloseDate: string;
+  owner: string;
+  splits: string; // JSON: [{owner, pct}]
+  contactIds: string; // CSV
+  companyId: string;
+  contractStatus: ContractStatus;
+  lostReason: string;
+  winReason: string;
+  stageEnteredAt: string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string;
+}
+
 export type MemberRole = "admin" | "rep" | "viewer";
 
 export interface Member {

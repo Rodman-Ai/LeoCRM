@@ -3,24 +3,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { api } from "@/lib/client";
-import type { Campaign, EmailRecord, Lead } from "@/lib/types";
+import type { Campaign, Deal, EmailRecord, Lead } from "@/lib/types";
 import { LEAD_STAGES } from "@/lib/types";
 
 export default function ReportsPage() {
   const [emails, setEmails] = useState<EmailRecord[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
 
   useEffect(() => {
     (async () => {
-      const [e, l, c] = await Promise.all([
+      const [e, l, c, d] = await Promise.all([
         api.get<EmailRecord[]>("/api/emails"),
         api.get<Lead[]>("/api/leads"),
         api.get<Campaign[]>("/api/campaigns"),
+        api.get<Deal[]>("/api/deals").catch(() => [] as Deal[]),
       ]);
       setEmails(e);
       setLeads(l);
       setCampaigns(c);
+      setDeals(d);
     })();
   }, []);
 
@@ -317,6 +320,119 @@ export default function ReportsPage() {
           ))}
         </div>
       </div>
+
+      <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
+        Forecast by month (deals)
+      </h2>
+      {(() => {
+        if (deals.length === 0)
+          return (
+            <div className="card text-sm text-slate-500">
+              No deals yet — head to Deals to add some.
+            </div>
+          );
+        const buckets = new Map<
+          string,
+          { weighted: number; raw: number; count: number; won: number }
+        >();
+        for (const d of deals) {
+          if (!d.expectedCloseDate || d.stage === "lost") continue;
+          const month = d.expectedCloseDate.slice(0, 7);
+          const cur = buckets.get(month) ?? {
+            weighted: 0,
+            raw: 0,
+            count: 0,
+            won: 0,
+          };
+          cur.raw += Number(d.value || 0);
+          cur.weighted += Number(d.value || 0) * Number(d.probability || 0);
+          cur.count++;
+          if (d.stage === "won") cur.won += Number(d.value || 0);
+          buckets.set(month, cur);
+        }
+        const months = Array.from(buckets.keys()).sort();
+        const max = Math.max(1, ...months.map((m) => buckets.get(m)!.raw));
+        return (
+          <div className="card space-y-2">
+            {months.map((m) => {
+              const b = buckets.get(m)!;
+              return (
+                <div key={m} className="flex items-center gap-3 text-sm">
+                  <div className="w-20 text-xs text-slate-500">{m}</div>
+                  <div className="h-5 flex-1 rounded bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className="h-full rounded bg-leo-500"
+                      style={{ width: `${(b.raw / max) * 100}%`, opacity: 0.5 }}
+                    />
+                    <div
+                      className="-mt-5 h-5 rounded bg-emerald-500"
+                      style={{ width: `${(b.weighted / max) * 100}%` }}
+                    />
+                  </div>
+                  <div className="w-40 text-right text-xs">
+                    ${Math.round(b.raw / 1000).toLocaleString()}k raw ·{" "}
+                    <span className="text-emerald-600">
+                      ${Math.round(b.weighted / 1000).toLocaleString()}k
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+            <p className="text-[11px] text-slate-400">
+              Bar = open pipeline; green = weighted by deal probability.
+            </p>
+          </div>
+        );
+      })()}
+
+      <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
+        Stale-deal SLA alerts
+      </h2>
+      {(() => {
+        const stale = deals.filter(
+          (d) =>
+            d.stage !== "won" &&
+            d.stage !== "lost" &&
+            d.stageEnteredAt &&
+            Date.now() - new Date(d.stageEnteredAt).getTime() >
+              14 * 24 * 3600 * 1000,
+        );
+        if (stale.length === 0)
+          return (
+            <div className="card text-sm text-emerald-700 dark:text-emerald-300">
+              All deals moved within the last 14 days. ✓
+            </div>
+          );
+        return (
+          <div className="card divide-y divide-slate-200 p-0 dark:divide-slate-800">
+            {stale.map((d) => {
+              const days = Math.round(
+                (Date.now() - new Date(d.stageEnteredAt).getTime()) /
+                  (24 * 3600 * 1000),
+              );
+              return (
+                <div
+                  key={d.id}
+                  className="flex items-center gap-3 p-3 text-sm"
+                >
+                  <span className="badge bg-rose-100 text-rose-700">
+                    {days}d in {d.stage}
+                  </span>
+                  <a
+                    href={`/deals/${d.id}`}
+                    className="font-medium hover:text-leo-600"
+                  >
+                    {d.name}
+                  </a>
+                  <span className="ml-auto text-xs text-slate-500">
+                    ${Number(d.value || 0).toLocaleString()}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
         Lead source ROI
