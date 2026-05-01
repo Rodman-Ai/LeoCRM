@@ -3,6 +3,7 @@
 import {
   SEED_ACTIVITY,
   SEED_AUDIT,
+  SEED_AUTOMATIONS,
   SEED_CAMPAIGNS,
   SEED_COMPANIES,
   SEED_CONTACTS,
@@ -12,6 +13,7 @@ import {
   SEED_ENROLLMENTS,
   SEED_FORMS,
   SEED_LEADS,
+  SEED_MEETINGS,
   SEED_MEMBERS,
   SEED_PIPELINES,
   SEED_SCHEDULED,
@@ -21,7 +23,9 @@ import {
   SEED_SUPPRESSION,
   SEED_TASKS,
   SEED_TEMPLATES,
+  SEED_TOKENS,
   SEED_VIEWS,
+  SEED_WEBHOOKS,
 } from "./seed";
 
 const PREFIX = "leocrm.demo.";
@@ -52,6 +56,10 @@ export const TABLES = {
   scheduled: SEED_SCHEDULED,
   suppression: SEED_SUPPRESSION,
   snippets: SEED_SNIPPETS,
+  automations: SEED_AUTOMATIONS,
+  webhooks: SEED_WEBHOOKS,
+  tokens: SEED_TOKENS,
+  meetings: SEED_MEETINGS,
 } as const;
 
 export type TableName = keyof typeof TABLES;

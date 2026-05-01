@@ -116,6 +116,8 @@ export interface Sequence {
   createdAt: string;
 }
 
+export type SequenceStepType = "email" | "linkedin" | "call" | "task";
+
 export interface SequenceStep {
   id: string;
   sequenceId: string;
@@ -123,6 +125,9 @@ export interface SequenceStep {
   delayDays: string;
   subjectHint: string;
   instructions: string;
+  type: SequenceStepType;
+  variantB: string;
+  conditions: string;
   createdAt: string;
 }
 
@@ -267,6 +272,54 @@ export interface Snippet {
   trigger: string;
   name: string;
   body: string;
+  createdAt: string;
+}
+
+export type AutomationTrigger =
+  | "lead_stage_changed"
+  | "form_submitted"
+  | "score_threshold"
+  | "deal_stage_changed"
+  | "email_replied";
+
+export interface Automation {
+  id: string;
+  name: string;
+  trigger: AutomationTrigger;
+  condition: string;
+  action: string;
+  config: string;
+  active: "yes" | "no";
+  createdAt: string;
+}
+
+export interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+  events: string;
+  secret: string;
+  active: "yes" | "no";
+  createdAt: string;
+}
+
+export interface ApiToken {
+  id: string;
+  name: string;
+  memberId: string;
+  token: string;
+  createdAt: string;
+  lastUsedAt: string;
+}
+
+export interface Meeting {
+  id: string;
+  slug: string;
+  memberId: string;
+  title: string;
+  duration: string;
+  availability: string;
+  active: "yes" | "no";
   createdAt: string;
 }
 

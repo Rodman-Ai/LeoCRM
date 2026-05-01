@@ -136,6 +136,9 @@ export const SHEETS: Record<string, SheetSchema> = {
       "delayDays",
       "subjectHint",
       "instructions",
+      "type",
+      "variantB",
+      "conditions",
       "createdAt",
     ],
   },
@@ -199,6 +202,40 @@ export const SHEETS: Record<string, SheetSchema> = {
   Snippets: {
     title: "Snippets",
     headers: ["id", "trigger", "name", "body", "createdAt"],
+  },
+  Automations: {
+    title: "Automations",
+    headers: [
+      "id",
+      "name",
+      "trigger",
+      "condition",
+      "action",
+      "config",
+      "active",
+      "createdAt",
+    ],
+  },
+  Webhooks: {
+    title: "Webhooks",
+    headers: ["id", "name", "url", "events", "secret", "active", "createdAt"],
+  },
+  Tokens: {
+    title: "Tokens",
+    headers: ["id", "name", "memberId", "token", "createdAt", "lastUsedAt"],
+  },
+  Meetings: {
+    title: "Meetings",
+    headers: [
+      "id",
+      "slug",
+      "memberId",
+      "title",
+      "duration",
+      "availability",
+      "active",
+      "createdAt",
+    ],
   },
   Deals: {
     title: "Deals",

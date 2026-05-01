@@ -3,7 +3,9 @@
 
 import type {
   Activity,
+  ApiToken,
   AuditEntry,
+  Automation,
   Campaign,
   Company,
   Contact,
@@ -13,6 +15,7 @@ import type {
   Enrollment,
   FormDef,
   Lead,
+  Meeting,
   Member,
   Pipeline,
   SavedView,
@@ -23,6 +26,7 @@ import type {
   SuppressionEntry,
   Task,
   Template,
+  Webhook,
 } from "../types";
 
 const NOW = "2026-04-30T10:00:00.000Z";
@@ -923,7 +927,10 @@ export const SEED_SEQUENCES: Sequence[] = [
   { id: "seq_demo_003", name: "Cold re-engage 90d", goal: "Re-warm leads who went cold 60-120 days ago.", tone: "friendly, no-pressure", status: "paused", createdAt: D(-30) },
 ];
 
-export const SEED_SEQUENCE_STEPS: SequenceStep[] = [
+// Existing seed rows omit the newer multi-channel/A-B/conditions columns;
+// undefined values render as empty strings via the demo store, matching
+// real Sheets behavior. Cast to suppress strict-field checks.
+export const SEED_SEQUENCE_STEPS: SequenceStep[] = ([
   {
     id: "step_demo_001",
     sequenceId: "seq_demo_001",
@@ -957,7 +964,7 @@ export const SEED_SEQUENCE_STEPS: SequenceStep[] = [
   { id: "step_demo_007", sequenceId: "seq_demo_002", stepIndex: "3", delayDays: "7", subjectHint: "Last note for now", instructions: "Soft breakup.", createdAt: D(-21) },
   { id: "step_demo_008", sequenceId: "seq_demo_003", stepIndex: "0", delayDays: "0", subjectHint: "Still on the radar?", instructions: "Reference what's new since last contact.", createdAt: D(-30) },
   { id: "step_demo_009", sequenceId: "seq_demo_003", stepIndex: "1", delayDays: "5", subjectHint: "Quick what's-new", instructions: "Bullet list of recent product changes.", createdAt: D(-30) },
-];
+] as Partial<SequenceStep>[]) as SequenceStep[];
 
 export const SEED_ENROLLMENTS: Enrollment[] = [
   { id: "en_demo_001", sequenceId: "seq_demo_001", contactId: "c_demo_003", status: "active", currentStep: "1", nextRunAt: D(2), lastRunAt: D(-1), createdAt: D(-1), stoppedReason: "" },
@@ -1001,6 +1008,29 @@ export const SEED_FORMS: FormDef[] = [
   },
   { id: "f_demo_003", slug: "investor-intro", name: "Investor intro request", fields: '["name","email","company","role","notes"]', redirectUrl: "", tags: "investor", sequenceId: "", createdAt: D(-5) },
   { id: "f_demo_004", slug: "partner-program", name: "Partner program signup", fields: '["name","email","company","notes"]', redirectUrl: "", tags: "partner", sequenceId: "seq_demo_002", createdAt: D(-3) },
+];
+
+export const SEED_AUTOMATIONS: Automation[] = [
+  { id: "au_demo_001", name: "High score → create task", trigger: "score_threshold", condition: '{"min":80}', action: "create_task", config: '{"title":"AI scored 80+ — reach out today","dueOffsetDays":0}', active: "yes", createdAt: D(-30) },
+  { id: "au_demo_002", name: "Form: demo-request → enroll in Founder seq", trigger: "form_submitted", condition: '{"slug":"demo-request"}', action: "enroll_sequence", config: '{"sequenceId":"seq_demo_001"}', active: "yes", createdAt: D(-21) },
+  { id: "au_demo_003", name: "Won deal → notify Slack", trigger: "deal_stage_changed", condition: '{"stage":"won"}', action: "webhook", config: '{"webhookId":"wh_demo_001","template":":tada: {{deal.name}} won — ${{deal.value}}"}', active: "yes", createdAt: D(-14) },
+  { id: "au_demo_004", name: "Reply received → bump score", trigger: "email_replied", condition: "{}", action: "bump_score", config: '{"delta":10}', active: "no", createdAt: D(-7) },
+];
+
+export const SEED_WEBHOOKS: Webhook[] = [
+  { id: "wh_demo_001", name: "Slack #revenue", url: "https://hooks.slack.example/T0/B0/X", events: "deal_won,deal_lost,email_replied", secret: "shh_demo_secret", active: "yes", createdAt: D(-21) },
+  { id: "wh_demo_002", name: "Internal notifier", url: "https://api.yourco.example/leocrm/hook", events: "form_submitted", secret: "", active: "yes", createdAt: D(-14) },
+];
+
+export const SEED_TOKENS: ApiToken[] = [
+  { id: "tok_demo_001", name: "Zapier", memberId: "m_demo_001", token: "leo_pk_demo_z9q3v7tx", createdAt: D(-21), lastUsedAt: D(-1) },
+  { id: "tok_demo_002", name: "Internal cron", memberId: "m_demo_001", token: "leo_pk_demo_8h4ku2vl", createdAt: D(-14), lastUsedAt: D(-3) },
+];
+
+export const SEED_MEETINGS: Meeting[] = [
+  { id: "mt_demo_001", slug: "you-15min", memberId: "m_demo_001", title: "15-min intro", duration: "15", availability: "Tue,Wed,Thu 10-12", active: "yes", createdAt: D(-30) },
+  { id: "mt_demo_002", slug: "you-30min", memberId: "m_demo_001", title: "30-min demo", duration: "30", availability: "Mon-Fri 14-17", active: "yes", createdAt: D(-21) },
+  { id: "mt_demo_003", slug: "alex-15min", memberId: "m_demo_002", title: "Alex: 15-min", duration: "15", availability: "Mon-Fri 9-12 ET", active: "yes", createdAt: D(-14) },
 ];
 
 export const SEED_EMAIL_EVENTS: EmailEvent[] = [

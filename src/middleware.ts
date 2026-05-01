@@ -6,6 +6,6 @@ export { default } from "next-auth/middleware";
 // prospects can submit; those endpoints use owner credentials from env vars.
 export const config = {
   matcher: [
-    "/((?!login|f/|api|_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest).*)",
+    "/((?!login|f/|m/|api|_next/static|_next/image|favicon.ico|icon.svg|manifest.webmanifest).*)",
   ],
 };

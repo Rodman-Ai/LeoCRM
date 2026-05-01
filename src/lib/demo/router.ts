@@ -144,6 +144,28 @@ async function dispatch(ctx: RouteCtx): Promise<unknown> {
   // snippets
   if (pathname === "/api/snippets") return crud("snippets", "sn", ctx);
 
+  // automations / webhooks / tokens / meetings
+  if (pathname === "/api/automations") return crud("automations", "au", ctx);
+  if (pathname === "/api/webhooks") return crud("webhooks", "wh", ctx);
+  if (pathname === "/api/tokens") {
+    if (method === "GET") return readTable("tokens");
+    if (method === "POST") {
+      const rows = readTable<Record<string, string>>("tokens");
+      const tok = {
+        id: newId("tok"),
+        name: String(body?.name ?? "Token"),
+        memberId: String(body?.memberId ?? ""),
+        token: `leo_pk_${Math.random().toString(36).slice(2, 14)}${Math.random().toString(36).slice(2, 14)}`,
+        createdAt: nowIso(),
+        lastUsedAt: "",
+      };
+      rows.push(tok);
+      writeTable("tokens", rows);
+      return tok;
+    }
+  }
+  if (pathname === "/api/meetings") return crud("meetings", "mt", ctx);
+
   // AI subject test (5 variants)
   if (pathname === "/api/ai/subject-test") {
     const c = (body?.contact ?? {}) as { name?: string; company?: string };
@@ -587,6 +609,9 @@ function sequencesList(method: string, body: Record<string, unknown> | null) {
         delayDays: String(s.delayDays ?? (i === 0 ? 0 : 3)),
         subjectHint: String(s.subjectHint ?? ""),
         instructions: String(s.instructions ?? body?.goal ?? ""),
+        type: (s.type as SequenceStep["type"]) ?? "email",
+        variantB: String(s.variantB ?? ""),
+        conditions: String(s.conditions ?? ""),
         createdAt: nowIso(),
       });
     });
