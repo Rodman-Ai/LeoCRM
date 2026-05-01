@@ -25,8 +25,20 @@ export interface Contact {
   linkedin: string;
   tags: string;
   notes: string;
+  timezone?: string;
+  birthday?: string;
+  dnc?: "yes" | "no" | "";
+  archivedAt?: string;
+  custom?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TagDef {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: string;
 }
 
 export interface Lead {
@@ -151,6 +163,8 @@ export interface Company {
   size: string;
   website: string;
   notes: string;
+  parentId?: string;
+  logoUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

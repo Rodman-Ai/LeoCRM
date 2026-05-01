@@ -165,6 +165,7 @@ async function dispatch(ctx: RouteCtx): Promise<unknown> {
     }
   }
   if (pathname === "/api/meetings") return crud("meetings", "mt", ctx);
+  if (pathname === "/api/tags") return crud("tags", "tg", ctx);
 
   // AI subject test (5 variants)
   if (pathname === "/api/ai/subject-test") {

@@ -24,6 +24,7 @@ import type {
   SequenceStep,
   Snippet,
   SuppressionEntry,
+  TagDef,
   Task,
   Template,
   Webhook,
@@ -1008,6 +1009,17 @@ export const SEED_FORMS: FormDef[] = [
   },
   { id: "f_demo_003", slug: "investor-intro", name: "Investor intro request", fields: '["name","email","company","role","notes"]', redirectUrl: "", tags: "investor", sequenceId: "", createdAt: D(-5) },
   { id: "f_demo_004", slug: "partner-program", name: "Partner program signup", fields: '["name","email","company","notes"]', redirectUrl: "", tags: "partner", sequenceId: "seq_demo_002", createdAt: D(-3) },
+];
+
+export const SEED_TAGS: TagDef[] = [
+  { id: "tg_demo_001", name: "ICP", color: "leo", createdAt: D(-30) },
+  { id: "tg_demo_002", name: "fintech", color: "sky", createdAt: D(-30) },
+  { id: "tg_demo_003", name: "healthcare", color: "emerald", createdAt: D(-30) },
+  { id: "tg_demo_004", name: "founder", color: "violet", createdAt: D(-30) },
+  { id: "tg_demo_005", name: "champion", color: "amber", createdAt: D(-30) },
+  { id: "tg_demo_006", name: "replied", color: "rose", createdAt: D(-30) },
+  { id: "tg_demo_007", name: "investor", color: "fuchsia", createdAt: D(-30) },
+  { id: "tg_demo_008", name: "marketing", color: "orange", createdAt: D(-30) },
 ];
 
 export const SEED_AUTOMATIONS: Automation[] = [

@@ -608,6 +608,240 @@ export default function ReportsPage() {
         );
       })()}
 
+      <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
+        Sales velocity
+      </h2>
+      {(() => {
+        const won = deals.filter((d) => d.stage === "won" && d.closedAt);
+        if (won.length === 0)
+          return (
+            <div className="card text-sm text-slate-500">
+              No won deals to compute velocity.
+            </div>
+          );
+        const days = won.map(
+          (d) =>
+            (new Date(d.closedAt).getTime() -
+              new Date(d.createdAt).getTime()) /
+            (24 * 3600 * 1000),
+        );
+        const avg = days.reduce((s, n) => s + n, 0) / days.length;
+        const median = days.slice().sort((a, b) => a - b)[
+          Math.floor(days.length / 2)
+        ];
+        return (
+          <div className="card grid grid-cols-3 gap-3 text-sm">
+            <div>
+              <div className="text-xs text-slate-500">Avg days to close</div>
+              <div className="text-xl font-semibold">{avg.toFixed(1)}d</div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500">Median days</div>
+              <div className="text-xl font-semibold">{median.toFixed(0)}d</div>
+            </div>
+            <div>
+              <div className="text-xs text-slate-500">Won deals</div>
+              <div className="text-xl font-semibold">{won.length}</div>
+            </div>
+          </div>
+        );
+      })()}
+
+      <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
+        Reply-time decay
+      </h2>
+      {(() => {
+        const buckets = [
+          { lt: 1, label: "<1h" },
+          { lt: 4, label: "<4h" },
+          { lt: 24, label: "<24h" },
+          { lt: 72, label: "<3d" },
+          { lt: Infinity, label: "3d+" },
+        ];
+        const counts = buckets.map(() => 0);
+        for (const e of replied) {
+          if (!e.sentAt || !e.repliedAt) continue;
+          const hours =
+            (new Date(e.repliedAt).getTime() -
+              new Date(e.sentAt).getTime()) /
+            3600000;
+          for (let i = 0; i < buckets.length; i++) {
+            if (hours < buckets[i].lt) {
+              counts[i]++;
+              break;
+            }
+          }
+        }
+        const max = Math.max(1, ...counts);
+        return (
+          <div className="card space-y-1">
+            {buckets.map((b, i) => (
+              <div key={b.label} className="flex items-center gap-3 text-sm">
+                <div className="w-12 text-xs text-slate-500">{b.label}</div>
+                <div className="h-4 flex-1 rounded bg-slate-100 dark:bg-slate-800">
+                  <div
+                    className="h-full rounded bg-leo-500"
+                    style={{ width: `${(counts[i] / max) * 100}%` }}
+                  />
+                </div>
+                <div className="w-10 text-right text-xs">{counts[i]}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
+        Lost-reason breakdown
+      </h2>
+      {(() => {
+        const lost = deals.filter((d) => d.stage === "lost" && d.lostReason);
+        if (lost.length === 0)
+          return (
+            <div className="card text-sm text-slate-500">
+              No lost deals with reasons recorded.
+            </div>
+          );
+        const counts = new Map<string, number>();
+        for (const d of lost) {
+          const key = d.lostReason.split(" ").slice(0, 4).join(" ") || "(blank)";
+          counts.set(key, (counts.get(key) ?? 0) + 1);
+        }
+        const total = lost.length;
+        return (
+          <div className="card space-y-1 text-sm">
+            {Array.from(counts.entries()).map(([k, n]) => (
+              <div key={k} className="flex items-center gap-3">
+                <div className="w-48 truncate text-xs text-slate-500">
+                  {k}
+                </div>
+                <div className="h-4 flex-1 rounded bg-slate-100 dark:bg-slate-800">
+                  <div
+                    className="h-full rounded bg-rose-500"
+                    style={{ width: `${(n / total) * 100}%` }}
+                  />
+                </div>
+                <div className="w-8 text-right text-xs">{n}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
+        Rep leaderboard
+      </h2>
+      {(() => {
+        const by = new Map<
+          string,
+          { sent: number; replied: number; won: number; wonValue: number }
+        >();
+        for (const e of sent) {
+          const k = "you@yourco.example";
+          const cur = by.get(k) ?? {
+            sent: 0,
+            replied: 0,
+            won: 0,
+            wonValue: 0,
+          };
+          cur.sent++;
+          if (e.repliedAt) cur.replied++;
+          by.set(k, cur);
+        }
+        for (const d of deals) {
+          const k = d.owner || "—";
+          const cur = by.get(k) ?? {
+            sent: 0,
+            replied: 0,
+            won: 0,
+            wonValue: 0,
+          };
+          if (d.stage === "won") {
+            cur.won++;
+            cur.wonValue += Number(d.value || 0);
+          }
+          by.set(k, cur);
+        }
+        const rows = Array.from(by.entries()).sort(
+          (a, b) => b[1].wonValue - a[1].wonValue,
+        );
+        return (
+          <div className="card overflow-x-auto p-0">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900">
+                <tr>
+                  <th className="p-2 text-left">Member</th>
+                  <th className="p-2 text-right">Sent</th>
+                  <th className="p-2 text-right">Replies</th>
+                  <th className="p-2 text-right">Reply %</th>
+                  <th className="p-2 text-right">Won deals</th>
+                  <th className="p-2 text-right">$ won</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(([k, s]) => (
+                  <tr
+                    key={k}
+                    className="border-t border-slate-100 dark:border-slate-800"
+                  >
+                    <td className="p-2 font-medium">{k}</td>
+                    <td className="p-2 text-right">{s.sent}</td>
+                    <td className="p-2 text-right">{s.replied}</td>
+                    <td className="p-2 text-right">
+                      {s.sent
+                        ? Math.round((s.replied / s.sent) * 100)
+                        : 0}
+                      %
+                    </td>
+                    <td className="p-2 text-right">{s.won}</td>
+                    <td className="p-2 text-right">
+                      ${Math.round(s.wonValue / 1000).toLocaleString()}k
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      })()}
+
+      <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">
+        Best hour-of-day
+      </h2>
+      {(() => {
+        const sentByHour = new Array(24).fill(0);
+        const replyByHour = new Array(24).fill(0);
+        for (const e of sent) {
+          if (!e.sentAt) continue;
+          const h = new Date(e.sentAt).getHours();
+          sentByHour[h]++;
+          if (e.repliedAt) replyByHour[h]++;
+        }
+        const max = Math.max(1, ...sentByHour);
+        return (
+          <div className="card">
+            <div className="grid grid-cols-12 gap-1 text-[10px]">
+              {sentByHour.map((n, h) => (
+                <div key={h} className="text-center">
+                  <div className="text-slate-400">{h}</div>
+                  <div
+                    className="mx-auto mt-1 rounded bg-leo-500"
+                    style={{
+                      height: `${Math.max(4, (n / max) * 60)}px`,
+                      opacity: n === 0 ? 0.1 : 0.4 + (n / max) * 0.6,
+                    }}
+                    title={`${h}:00 — ${n} sends, ${replyByHour[h]} replies`}
+                  />
+                  <div className="mt-1 text-emerald-600">
+                    {replyByHour[h] || ""}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {campaigns.length > 0 ? (
         <>
           <h2 className="mb-3 mt-8 text-sm font-semibold text-slate-500">

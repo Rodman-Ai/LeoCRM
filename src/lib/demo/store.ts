@@ -21,6 +21,7 @@ import {
   SEED_SEQUENCE_STEPS,
   SEED_SNIPPETS,
   SEED_SUPPRESSION,
+  SEED_TAGS,
   SEED_TASKS,
   SEED_TEMPLATES,
   SEED_TOKENS,
@@ -60,6 +61,7 @@ export const TABLES = {
   webhooks: SEED_WEBHOOKS,
   tokens: SEED_TOKENS,
   meetings: SEED_MEETINGS,
+  tags: SEED_TAGS,
 } as const;
 
 export type TableName = keyof typeof TABLES;
