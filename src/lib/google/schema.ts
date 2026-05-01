@@ -170,6 +170,31 @@ export const SHEETS: Record<string, SheetSchema> = {
     title: "Views",
     headers: ["id", "name", "filter", "createdAt"],
   },
+  Members: {
+    title: "Members",
+    headers: [
+      "id",
+      "email",
+      "name",
+      "role",
+      "signature",
+      "timezone",
+      "active",
+      "createdAt",
+    ],
+  },
+  AuditLog: {
+    title: "AuditLog",
+    headers: [
+      "id",
+      "actor",
+      "action",
+      "entity",
+      "entityId",
+      "diff",
+      "createdAt",
+    ],
+  },
   Config: {
     title: "Config",
     headers: ["key", "value"],

@@ -11,6 +11,7 @@ import { QuickAdd } from "./QuickAdd";
 import { GlobalShortcuts } from "./GlobalShortcuts";
 import { RecentlyViewed } from "./RecentlyViewed";
 import { OnboardingTour } from "./OnboardingTour";
+import { MentionsBell } from "./MentionsBell";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
@@ -24,6 +25,8 @@ const NAV = [
   { href: "/reports", label: "Reports" },
   { href: "/templates", label: "Templates" },
   { href: "/forms", label: "Forms" },
+  { href: "/members", label: "Team" },
+  { href: "/audit", label: "Audit" },
   { href: "/settings", label: "Settings" },
 ];
 
@@ -118,6 +121,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="hidden h-14 items-center gap-3 border-b border-slate-200 bg-white px-6 dark:border-slate-800 dark:bg-slate-950 md:flex">
           <span className="text-xs text-slate-400">Press ⌘K to search · n to add contact · c to compose</span>
           <div className="ml-auto flex items-center gap-2">
+            <MentionsBell />
             <QuickAdd />
           </div>
         </header>

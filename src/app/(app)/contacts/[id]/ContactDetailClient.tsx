@@ -9,7 +9,14 @@ import { pushRecent } from "@/lib/recents";
 import { renderMarkdown } from "@/lib/markdown";
 import { pushTrash } from "@/lib/trash";
 import { useUI } from "@/components/ui/UIProvider";
-import type { Activity, Contact, EmailRecord, Lead, Task } from "@/lib/types";
+import type {
+  Activity,
+  Contact,
+  EmailRecord,
+  Lead,
+  Member,
+  Task,
+} from "@/lib/types";
 import { LEAD_STAGES, type LeadStage } from "@/lib/types";
 
 export default function ContactDetailPage() {
@@ -32,8 +39,10 @@ export default function ContactDetailPage() {
   const [summary, setSummary] = useState<string | null>(null);
   const ui = useUI();
   const [allContacts, setAllContacts] = useState<Contact[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   useEffect(() => {
     api.get<Contact[]>("/api/contacts").then(setAllContacts);
+    api.get<Member[]>("/api/members").then(setMembers).catch(() => {});
   }, []);
 
   function followUpSuggestions() {
@@ -411,7 +420,30 @@ export default function ContactDetailPage() {
                     await load();
                   }}
                 />
-                <Row k="Owner" v={lead.owner} />
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-slate-400">
+                    Owner
+                  </dt>
+                  <dd className="text-sm">
+                    <select
+                      value={lead.owner || ""}
+                      onChange={async (e) => {
+                        await api.patch(`/api/leads/${lead.id}`, {
+                          owner: e.target.value,
+                        });
+                        await load();
+                      }}
+                      className="input mt-1 w-full py-1 text-sm"
+                    >
+                      <option value="">— Unassigned —</option>
+                      {members.map((m) => (
+                        <option key={m.id} value={m.email}>
+                          {m.name || m.email}
+                        </option>
+                      ))}
+                    </select>
+                  </dd>
+                </div>
               </dl>
             </>
           ) : (

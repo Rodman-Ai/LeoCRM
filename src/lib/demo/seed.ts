@@ -3,6 +3,7 @@
 
 import type {
   Activity,
+  AuditEntry,
   Campaign,
   Company,
   Contact,
@@ -10,6 +11,7 @@ import type {
   Enrollment,
   FormDef,
   Lead,
+  Member,
   SavedView,
   Sequence,
   SequenceStep,
@@ -905,6 +907,8 @@ export const SEED_ACTIVITY: Activity[] = [
   { id: "a_demo_040", contactId: "c_demo_026", type: "form_submission", summary: "Form: Request a demo", meta: '{"slug":"demo-request"}', createdAt: D(-1), actor: "form" },
   { id: "a_demo_041", contactId: "c_demo_028", type: "note", summary: "Referral from Tom Becker", meta: "", createdAt: D(-1), actor: "you@yourco.example" },
   { id: "a_demo_042", contactId: "c_demo_030", type: "stage_change", summary: "Stage: qualified → won", meta: "", createdAt: D(-7), actor: "you@yourco.example" },
+  { id: "a_demo_043", contactId: "c_demo_011", type: "note", summary: "@[You (Demo)] Yuki asked about ROI — can you send the calculator?", meta: "", createdAt: D(-1), actor: "alex@yourco.example" },
+  { id: "a_demo_044", contactId: "c_demo_022", type: "note", summary: "@[Alex Rivera] handing Vellum Pay to you — they're hot.", meta: "", createdAt: D(-1), actor: "you@yourco.example" },
 ];
 
 export const SEED_SEQUENCES: Sequence[] = [
@@ -991,6 +995,19 @@ export const SEED_FORMS: FormDef[] = [
   },
   { id: "f_demo_003", slug: "investor-intro", name: "Investor intro request", fields: '["name","email","company","role","notes"]', redirectUrl: "", tags: "investor", sequenceId: "", createdAt: D(-5) },
   { id: "f_demo_004", slug: "partner-program", name: "Partner program signup", fields: '["name","email","company","notes"]', redirectUrl: "", tags: "partner", sequenceId: "seq_demo_002", createdAt: D(-3) },
+];
+
+export const SEED_MEMBERS: Member[] = [
+  { id: "m_demo_001", email: "you@yourco.example", name: "You (Demo)", role: "admin", signature: "— You\nyourco.com", timezone: "America/Los_Angeles", active: "yes", createdAt: D(-30) },
+  { id: "m_demo_002", email: "alex@yourco.example", name: "Alex Rivera", role: "rep", signature: "— Alex\nSenior AE", timezone: "America/New_York", active: "yes", createdAt: D(-25) },
+  { id: "m_demo_003", email: "sam@yourco.example", name: "Sam Patel", role: "rep", signature: "— Sam", timezone: "Europe/London", active: "yes", createdAt: D(-18) },
+  { id: "m_demo_004", email: "jordan@yourco.example", name: "Jordan Lee", role: "viewer", signature: "", timezone: "America/Chicago", active: "yes", createdAt: D(-7) },
+];
+
+export const SEED_AUDIT: AuditEntry[] = [
+  { id: "au_demo_001", actor: "you@yourco.example", action: "create", entity: "lead", entityId: "l_demo_030", diff: '{"stage":["—","won"]}', createdAt: D(-1) },
+  { id: "au_demo_002", actor: "alex@yourco.example", action: "update", entity: "contact", entityId: "c_demo_002", diff: '{"tags":["ICP","ICP, replied"]}', createdAt: D(-1) },
+  { id: "au_demo_003", actor: "sam@yourco.example", action: "create", entity: "task", entityId: "t_demo_005", diff: '{"title":["—","Send Summit Financial proposal"]}', createdAt: D(-2) },
 ];
 
 export const SEED_VIEWS: SavedView[] = [

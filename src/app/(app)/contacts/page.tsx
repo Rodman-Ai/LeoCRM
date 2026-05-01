@@ -18,6 +18,7 @@ interface ViewFilter {
   tag?: string;
   stage?: LeadStage | "";
   minScore?: number;
+  owner?: string;
 }
 
 type SortKey = "smart" | "score" | "lastContacted" | "name";
@@ -118,6 +119,10 @@ export default function ContactsPage() {
       if (filter.minScore !== undefined) {
         const lead = leadByContact.get(c.id);
         if (!lead || Number(lead.score || 0) < filter.minScore) return false;
+      }
+      if (filter.owner) {
+        const lead = leadByContact.get(c.id);
+        if (!lead || lead.owner !== filter.owner) return false;
       }
       return true;
     });
@@ -422,6 +427,10 @@ export default function ContactsPage() {
       />
       <div className="mb-2 flex flex-wrap gap-1 text-xs">
         <span className="text-slate-500 mr-1 self-center">Quick:</span>
+        <QuickChip
+          label="Assigned to me"
+          onClick={() => setFilter({ owner: "you@yourco.example" })}
+        />
         <QuickChip label="Hot (≥80)" onClick={() => setFilter({ minScore: 80 })} />
         <QuickChip
           label="Replied"

@@ -14,6 +14,7 @@ export default function DashboardPage() {
   const [emails, setEmails] = useState<EmailRecord[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activity, setActivity] = useState<Activity[]>([]);
+  const [activityActor, setActivityActor] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -317,9 +318,23 @@ export default function DashboardPage() {
         })()}
       </div>
 
-      <h2 className="mt-8 mb-3 text-sm font-semibold text-slate-500">
-        Activity feed
-      </h2>
+      <div className="mt-8 mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-500">Activity feed</h2>
+        <select
+          value={activityActor}
+          onChange={(e) => setActivityActor(e.target.value)}
+          className="input w-auto py-1 text-xs"
+        >
+          <option value="">All members</option>
+          {Array.from(new Set(activity.map((a) => a.actor).filter(Boolean))).map(
+            (a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ),
+          )}
+        </select>
+      </div>
       <div className="card divide-y divide-slate-200 p-0 dark:divide-slate-800">
         {activity.length === 0 ? (
           <div className="p-6 text-center text-sm text-slate-500">
@@ -327,6 +342,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           activity
+            .filter((a) => !activityActor || a.actor === activityActor)
             .slice()
             .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
             .slice(0, 10)

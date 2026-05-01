@@ -1,7 +1,13 @@
 // Routes /api/* fetch URLs to localStorage-backed handlers in DEMO_MODE.
 // Returns parsed JSON exactly like the real API would.
 
-import type { Activity, Lead, Sequence, SequenceStep } from "../types";
+import type {
+  Activity,
+  AuditEntry,
+  Lead,
+  Sequence,
+  SequenceStep,
+} from "../types";
 import { newId, nowIso, readTable, writeTable, resetDemo } from "./store";
 
 interface RouteCtx {
@@ -101,6 +107,24 @@ async function dispatch(ctx: RouteCtx): Promise<unknown> {
   if (pathname === "/api/sequences/enroll") return sequencesEnroll(body);
   if (pathname === "/api/sequences/run") return sequencesRun();
   if (pathname === "/api/enrollments") return readTable("enrollments");
+
+  // members
+  if (pathname === "/api/members") return crud("members", "m", ctx);
+  const mm = pathname.match(/^\/api\/members\/([^/]+)$/);
+  if (mm) return crudOne("members", mm[1], ctx);
+
+  // audit log
+  if (pathname === "/api/audit") {
+    const rows = readTable<AuditEntry>("audit");
+    const entity = search.get("entity");
+    const entityId = search.get("entityId");
+    let out = rows;
+    if (entity) out = out.filter((r) => r.entity === entity);
+    if (entityId) out = out.filter((r) => r.entityId === entityId);
+    return out
+      .slice()
+      .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
+  }
   const seqMatch = pathname.match(/^\/api\/sequences\/([^/]+)$/);
   if (seqMatch) {
     const seqs = readTable<Sequence>("sequences");
@@ -615,6 +639,15 @@ function formsSubmit(body: Record<string, unknown> | null) {
   const form = forms.find((f) => f.slug === slug);
   if (!form) throw new Error("form not found");
 
+  // Round-robin: assign to next active rep.
+  const members = readTable<Record<string, string>>("members").filter(
+    (m) => m.active === "yes" && m.role !== "viewer",
+  );
+  const owner =
+    members.length > 0
+      ? members[Math.floor(Date.now() / 1000) % members.length].email
+      : "you@yourco.example";
+
   const contacts = readTable<Record<string, string>>("contacts");
   const contact = {
     id: newId("c"),
@@ -640,7 +673,7 @@ function formsSubmit(body: Record<string, unknown> | null) {
     score: "0",
     scoreReason: "",
     value: "0",
-    owner: "demo@yourco.example",
+    owner,
     lastContactedAt: "",
     nextActionAt: "",
     nextAction: "",

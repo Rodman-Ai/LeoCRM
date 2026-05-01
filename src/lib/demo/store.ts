@@ -2,6 +2,7 @@
 
 import {
   SEED_ACTIVITY,
+  SEED_AUDIT,
   SEED_CAMPAIGNS,
   SEED_COMPANIES,
   SEED_CONTACTS,
@@ -9,6 +10,7 @@ import {
   SEED_ENROLLMENTS,
   SEED_FORMS,
   SEED_LEADS,
+  SEED_MEMBERS,
   SEED_SEQUENCES,
   SEED_SEQUENCE_STEPS,
   SEED_TASKS,
@@ -36,6 +38,8 @@ export const TABLES = {
   companies: SEED_COMPANIES,
   forms: SEED_FORMS,
   views: SEED_VIEWS,
+  members: SEED_MEMBERS,
+  audit: SEED_AUDIT,
 } as const;
 
 export type TableName = keyof typeof TABLES;

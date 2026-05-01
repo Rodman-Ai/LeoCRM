@@ -168,6 +168,29 @@ export interface SavedView {
   createdAt: string;
 }
 
+export type MemberRole = "admin" | "rep" | "viewer";
+
+export interface Member {
+  id: string;
+  email: string;
+  name: string;
+  role: MemberRole;
+  signature: string;
+  timezone: string;
+  active: "yes" | "no";
+  createdAt: string;
+}
+
+export interface AuditEntry {
+  id: string;
+  actor: string;
+  action: "create" | "update" | "delete" | "system";
+  entity: string;
+  entityId: string;
+  diff: string;
+  createdAt: string;
+}
+
 export interface Template {
   id: string;
   name: string;
