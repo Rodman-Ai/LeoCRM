@@ -1,0 +1,50 @@
+# Builds and publishes a static demo of the full LeoCRM app to GitHub Pages.
+#
+# Demo mode (NEXT_PUBLIC_DEMO_MODE=1) routes every /api/* call through a
+# localStorage-backed router (src/lib/demo/router.ts). The build script
+# temporarily moves src/app/api/ and src/middleware.ts aside so Next.js can
+# do a static `output: 'export'` build, then restores them.
+name: GitHub Pages (demo)
+
+on:
+  push:
+    branches: [main, claude/ai-email-crm-google-vwLTr]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Build static demo
+        env:
+          NEXT_PUBLIC_BASE_PATH: /LeoCRM
+        run: bash scripts/build-demo.sh
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: out
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
